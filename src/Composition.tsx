@@ -14,9 +14,20 @@ const CHANGE_START_TIME = 1.5; // When "symbols" and "Still" change (after words
 const CHANGE_DURATION = 0.15; // How long the transition takes
 
 // =============================================================================
-// WORD DATA
+// WORDLET DATA
 // =============================================================================
-const WORDS = ["Still", " drawing ", "symbols", " by hand?"] as const;
+// Each wordlet is an individual animation unit
+const WORDLETS = [
+  "Still",
+  " draw",
+  "ing",
+  " sym",
+  "bols",
+  " by",
+  " ha",
+  "nd",
+  "?",
+] as const;
 
 // =============================================================================
 // STYLE CONSTANTS
@@ -42,16 +53,16 @@ const TYPOGRAPHY = {
 // HELPERS
 // =============================================================================
 
-// Get the frame when a word first appears
-const getWordAppearFrame = (wordIndex: number): number =>
-  FIRST_WORD_APPEAR + wordIndex * WORD_STAGGER;
+// Get the frame when a wordlet first appears
+const getWordletAppearFrame = (index: number): number =>
+  FIRST_WORD_APPEAR + index * WORD_STAGGER;
 
-// Get word's current Y offset and opacity based on frame
-const getWordAnimation = (
+// Get wordlet's current Y offset and opacity based on frame
+const getWordletAnimation = (
   frame: number,
-  wordIndex: number
+  index: number
 ): { yOffset: number; opacity: number } => {
-  const appearFrame = getWordAppearFrame(wordIndex);
+  const appearFrame = getWordletAppearFrame(index);
 
   // Word hasn't appeared yet
   if (frame < appearFrame) {
@@ -114,8 +125,10 @@ export const MyComposition: React.FC = () => {
     [TYPOGRAPHY.fontWeightNormal, TYPOGRAPHY.fontWeightBold]
   );
 
-  // Get animation state for each word
-  const wordAnimations = WORDS.map((_, index) => getWordAnimation(frame, index));
+  // Get animation state for each wordlet
+  const wordletAnimations = WORDLETS.map((_, index) =>
+    getWordletAnimation(frame, index)
+  );
 
   return (
     <AbsoluteFill
@@ -132,51 +145,35 @@ export const MyComposition: React.FC = () => {
           color: COLORS.text,
         }}
       >
-        {/* Still */}
-        <span
-          style={{
-            display: "inline-block",
-            fontWeight: stillFontWeight,
-            transform: `translateY(${wordAnimations[0].yOffset}px)`,
-            opacity: wordAnimations[0].opacity,
-          }}
-        >
-          {WORDS[0]}
-        </span>
-        {/* drawing */}
-        <span
-          style={{
-            display: "inline-block",
-            transform: `translateY(${wordAnimations[1].yOffset}px)`,
-            opacity: wordAnimations[1].opacity,
-            whiteSpace: "pre",
-          }}
-        >
-          {WORDS[1]}
-        </span>
-        {/* symbols */}
-        <span
-          style={{
-            display: "inline-block",
-            fontFamily: transitionProgress > 0.5 ? FONTS.mono : FONTS.sans,
-            color: symbolsColor,
-            transform: `translateY(${wordAnimations[2].yOffset}px)`,
-            opacity: wordAnimations[2].opacity,
-          }}
-        >
-          {WORDS[2]}
-        </span>
-        {/* by hand? */}
-        <span
-          style={{
-            display: "inline-block",
-            transform: `translateY(${wordAnimations[3].yOffset}px)`,
-            opacity: wordAnimations[3].opacity,
-            whiteSpace: "pre",
-          }}
-        >
-          {WORDS[3]}
-        </span>
+        {WORDLETS.map((wordlet, index) => {
+          const anim = wordletAnimations[index];
+          const isSymbols = index === 3 || index === 4; // " sym" and "bols"
+          const isStill = index === 0;
+
+          return (
+            <span
+              key={index}
+              style={{
+                display: "inline-block",
+                transform: `translateY(${anim.yOffset}px)`,
+                opacity: anim.opacity,
+                whiteSpace: "pre",
+                // Special styles for "symbols" wordlets
+                ...(isSymbols && {
+                  fontFamily:
+                    transitionProgress > 0.5 ? FONTS.mono : FONTS.sans,
+                  color: symbolsColor,
+                }),
+                // Special style for "Still"
+                ...(isStill && {
+                  fontWeight: stillFontWeight,
+                }),
+              }}
+            >
+              {wordlet}
+            </span>
+          );
+        })}
       </div>
     </AbsoluteFill>
   );
