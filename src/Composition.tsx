@@ -1,4 +1,4 @@
-import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { AbsoluteFill, useCurrentFrame, interpolate, Easing } from "remotion";
 
 // =============================================================================
 // TIMING CONSTANTS (in frames)
@@ -8,10 +8,6 @@ const FIRST_WORD_APPEAR = BLANK_DURATION; // Frame 10
 const WORD_STAGGER = 3; // Frames between each word appearing (overlap with previous)
 const EASE_DURATION = 5; // Total frames to ease into final position
 const WORD_START_OFFSET = 25; // Pixels below final position when appearing
-
-// Later animation timing (in seconds, converted to frames via fps)
-const CHANGE_START_TIME = 1.5; // When "symbols" and "Still" change (after words settle)
-const CHANGE_DURATION = 0.15; // How long the transition takes
 
 // =============================================================================
 // WORDLET DATA
@@ -35,18 +31,14 @@ const WORDLETS = [
 const COLORS = {
   background: "#000000",
   text: "#ffffff",
-  teal: "#008282",
 } as const;
 
 const FONTS = {
   sans: "Geist, system-ui, sans-serif",
-  mono: "Geist Mono, ui-monospace, monospace",
 } as const;
 
 const TYPOGRAPHY = {
   fontSize: 56,
-  fontWeightNormal: 400,
-  fontWeightBold: 700,
 } as const;
 
 // =============================================================================
@@ -98,32 +90,6 @@ const getWordletAnimation = (
 
 export const MyComposition: React.FC = () => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  // Convert timing constants to frames for the later color/weight transition
-  const changeStartFrame = CHANGE_START_TIME * fps;
-  const changeEndFrame = (CHANGE_START_TIME + CHANGE_DURATION) * fps;
-
-  // Calculate transition progress (0 to 1) for color/weight changes
-  const transitionProgress = interpolate(
-    frame,
-    [changeStartFrame, changeEndFrame],
-    [0, 1],
-    {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    }
-  );
-
-  // Interpolate colors for "symbols"
-  const symbolsColor = interpolateColor(COLORS.text, COLORS.teal, transitionProgress);
-
-  // Interpolate font weight for "Still"
-  const stillFontWeight = interpolate(
-    transitionProgress,
-    [0, 1],
-    [TYPOGRAPHY.fontWeightNormal, TYPOGRAPHY.fontWeightBold]
-  );
 
   // Get animation state for each wordlet
   const wordletAnimations = WORDLETS.map((_, index) =>
@@ -147,8 +113,6 @@ export const MyComposition: React.FC = () => {
       >
         {WORDLETS.map((wordlet, index) => {
           const anim = wordletAnimations[index];
-          const isSymbols = index === 3 || index === 4; // " sym" and "bols"
-          const isStill = index === 0;
 
           return (
             <span
@@ -158,16 +122,6 @@ export const MyComposition: React.FC = () => {
                 transform: `translateY(${anim.yOffset}px)`,
                 opacity: anim.opacity,
                 whiteSpace: "pre",
-                // Special styles for "symbols" wordlets
-                ...(isSymbols && {
-                  fontFamily:
-                    transitionProgress > 0.5 ? FONTS.mono : FONTS.sans,
-                  color: symbolsColor,
-                }),
-                // Special style for "Still"
-                ...(isStill && {
-                  fontWeight: stillFontWeight,
-                }),
               }}
             >
               {wordlet}
@@ -178,28 +132,3 @@ export const MyComposition: React.FC = () => {
     </AbsoluteFill>
   );
 };
-
-// =============================================================================
-// HELPERS
-// =============================================================================
-
-function interpolateColor(from: string, to: string, progress: number): string {
-  const fromRgb = hexToRgb(from);
-  const toRgb = hexToRgb(to);
-
-  const r = Math.round(fromRgb.r + (toRgb.r - fromRgb.r) * progress);
-  const g = Math.round(fromRgb.g + (toRgb.g - fromRgb.g) * progress);
-  const b = Math.round(fromRgb.b + (toRgb.b - fromRgb.b) * progress);
-
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return { r: 255, g: 255, b: 255 };
-  return {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16),
-  };
-}
