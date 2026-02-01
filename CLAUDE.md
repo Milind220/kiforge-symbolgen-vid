@@ -2,6 +2,39 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Context
+
+**KiForge** is the AI layer for KiCAD. Software engineering has leaped ahead in the past 20 years, but PCB design and electrical engineering tools haven't changed significantly. That changes now — without it, PCB design becomes a bottleneck while everything else around it moves fast.
+
+This is the launch video for **Symbol Generator**, KiForge's first product. The idea: you never have to hand-draw schematic symbols ever again.
+
+**Brand Feel:**
+- The crispness and speed of doing things in a terminal (evoking the speed of code)
+- The sleekness of a minimal GUI (accessible for electrical engineers)
+- Fast, precise, modern
+
+## Color Themes
+
+**Fonts:** Geist (sans) and Geist Mono throughout.
+
+**Dark Mode** (Vercel/MKBHD style):
+- `black` (#000000) — primary background
+- `shadow-grey` (#272727) — secondary background, carbon/graphite accents
+- `silver` (#adadad) — matte silver for shapes and drawings
+- `white` (#ffffff) — text
+- `teal` (#008282) — highlights
+
+**Light Mode** (Solarized Light style):
+- `ivory-mist` (#fdf6e3) — primary background
+- `eggshell` (#eee8d5) — secondary background
+- `black` (#000000) — text
+- `shadow-grey` (#272727) — elements
+- `teal` (#008282) — highlights
+
+## Commit Convention
+
+Use conventional commit prefixes: `feat:`, `fix:`, `style:`, `chore:`, `docs:`, `refactor:`
+
 ## Commands
 
 ```bash
@@ -23,9 +56,6 @@ This is a Remotion project for programmatic video creation using React.
 **Configuration:**
 - `remotion.config.ts` - CLI config with Tailwind v4 integration enabled
 - Tailwind v4 is configured via `@remotion/tailwind-v4` with custom theme colors in `src/index.css`
-
-**Theme Colors:**
-The project defines a custom color palette in `src/index.css` with dark/light mode semantic colors including teal highlights (#008282) and eggshell/ivory backgrounds for light mode.
 
 ## Parameterization (CRITICAL)
 
