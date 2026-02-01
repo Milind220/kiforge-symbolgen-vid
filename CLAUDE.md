@@ -12,6 +12,7 @@ This is the launch video for **Symbol Generator**, KiForge's first product. The 
 - The crispness and speed of doing things in a terminal (evoking the speed of code)
 - The sleekness of a minimal GUI (accessible for electrical engineers)
 - Fast, precise, modern
+- Visual style like shadcn/Lyra — boxy, sharp edges, minimal
 
 ## Color Themes
 
