@@ -70,34 +70,21 @@ export const MyComposition: React.FC = () => {
       <div
         style={{
           fontSize: TYPOGRAPHY.fontSize,
+          fontFamily: FONTS.sans,
           color: COLORS.text,
-          display: "flex",
-          alignItems: "baseline",
         }}
       >
-        <span
-          style={{
-            fontFamily: FONTS.sans,
-            fontWeight: stillFontWeight,
-          }}
-        >
-          Still
-        </span>
-        <span style={{ fontFamily: FONTS.sans, fontWeight: TYPOGRAPHY.fontWeightNormal }}>
-          {" "}drawing{" "}
-        </span>
+        <span style={{ fontWeight: stillFontWeight }}>Still</span>
+        {" drawing "}
         <span
           style={{
             fontFamily: transitionProgress > 0.5 ? FONTS.mono : FONTS.sans,
             color: symbolsColor,
-            fontWeight: TYPOGRAPHY.fontWeightNormal,
           }}
         >
           symbols
         </span>
-        <span style={{ fontFamily: FONTS.sans, fontWeight: TYPOGRAPHY.fontWeightNormal }}>
-          {" "}by hand?
-        </span>
+        {" by hand?"}
       </div>
     </AbsoluteFill>
   );
