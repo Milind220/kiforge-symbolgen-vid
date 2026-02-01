@@ -16,7 +16,7 @@ const WORDLETS_DONE_FRAME =
 const SYMBOL_FRAME_START = WORDLETS_DONE_FRAME + 2; // Small pause, then frame starts
 const SYMBOL_FRAME_EASE_DURATION = 5; // 5 frames to whizz into position
 const SYMBOL_FRAME_START_OFFSET = 400; // Start far outside frame (whizz in effect)
-const SYMBOL_FRAME_STAGGER = 2; // Frames between bottom and top groups
+const SYMBOL_LINE_STAGGER = 1; // Frames between each line element
 
 // =============================================================================
 // WORDLET DATA
@@ -51,15 +51,12 @@ const TYPOGRAPHY = {
   fontSize: 56,
 } as const;
 
-// Symbol frame dimensions
+// Symbol frame dimensions (centered around text)
 const SYMBOL_FRAME = {
-  width: 180,
-  height: 260,
-  cornerLength: 40, // Length of corner bracket arms
-  strokeWidth: 3,
-  // Position offset from center (to the right of "symbols" word)
-  offsetX: 120,
-  offsetY: -20,
+  width: 240,
+  height: 320,
+  verticalArmLength: 50, // Length of vertical line segments
+  strokeWidth: 5,
 } as const;
 
 // =============================================================================
@@ -106,12 +103,12 @@ const getWordletAnimation = (
 };
 
 // Get symbol frame line animation (whizz in from below)
-// groupIndex: 0 = bottom lines (first), 1 = top lines (second)
+// lineIndex: 0-2 = bottom lines (first), 3-5 = top lines (second)
 const getSymbolLineAnimation = (
   frame: number,
-  groupIndex: number
+  lineIndex: number
 ): { yOffset: number; opacity: number } => {
-  const appearFrame = SYMBOL_FRAME_START + groupIndex * SYMBOL_FRAME_STAGGER;
+  const appearFrame = SYMBOL_FRAME_START + lineIndex * SYMBOL_LINE_STAGGER;
 
   // Line hasn't appeared yet
   if (frame < appearFrame) {
@@ -145,19 +142,34 @@ const getSymbolLineAnimation = (
 // SYMBOL FRAME COMPONENT
 // =============================================================================
 
+// 6 lines, each animates independently:
+// Bottom group (indices 0-2): left vertical, horizontal, right vertical
+// Top group (indices 3-5): left vertical, horizontal, right vertical
 const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
-  const { width, height, cornerLength, strokeWidth, offsetX, offsetY } =
-    SYMBOL_FRAME;
+  const { width, height, verticalArmLength, strokeWidth } = SYMBOL_FRAME;
 
-  // Bottom lines animate first (group 0), top lines second (group 1)
-  const bottomAnim = getSymbolLineAnimation(frame, 0);
-  const topAnim = getSymbolLineAnimation(frame, 1);
+  // Get animation for each of the 6 lines
+  const lineAnims = Array.from({ length: 6 }, (_, i) =>
+    getSymbolLineAnimation(frame, i)
+  );
 
-  // Calculate corner positions
+  // Calculate positions
   const left = -width / 2;
   const right = width / 2;
   const top = -height / 2;
   const bottom = height / 2;
+
+  // Line definitions: [x1, y1, x2, y2, animIndex]
+  const lines: [number, number, number, number, number][] = [
+    // Bottom group (animate first)
+    [left, bottom - verticalArmLength, left, bottom, 0], // Bottom left vertical
+    [left, bottom, right, bottom, 1], // Bottom horizontal
+    [right, bottom - verticalArmLength, right, bottom, 2], // Bottom right vertical
+    // Top group (animate second)
+    [left, top, left, top + verticalArmLength, 3], // Top left vertical
+    [left, top, right, top, 4], // Top horizontal
+    [right, top, right, top + verticalArmLength, 5], // Top right vertical
+  ];
 
   return (
     <svg
@@ -168,109 +180,28 @@ const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
         position: "absolute",
         left: "50%",
         top: "50%",
-        transform: `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`,
+        transform: "translate(-50%, -50%)",
         overflow: "visible",
       }}
     >
-      {/* Bottom left corner */}
-      <g
-        style={{
-          transform: `translateY(${bottomAnim.yOffset}px)`,
-          opacity: bottomAnim.opacity,
-        }}
-      >
-        <line
-          x1={left}
-          y1={bottom - cornerLength}
-          x2={left}
-          y2={bottom}
-          stroke={COLORS.silver}
-          strokeWidth={strokeWidth}
-        />
-        <line
-          x1={left}
-          y1={bottom}
-          x2={left + cornerLength}
-          y2={bottom}
-          stroke={COLORS.silver}
-          strokeWidth={strokeWidth}
-        />
-      </g>
-
-      {/* Bottom right corner */}
-      <g
-        style={{
-          transform: `translateY(${bottomAnim.yOffset}px)`,
-          opacity: bottomAnim.opacity,
-        }}
-      >
-        <line
-          x1={right - cornerLength}
-          y1={bottom}
-          x2={right}
-          y2={bottom}
-          stroke={COLORS.silver}
-          strokeWidth={strokeWidth}
-        />
-        <line
-          x1={right}
-          y1={bottom}
-          x2={right}
-          y2={bottom - cornerLength}
-          stroke={COLORS.silver}
-          strokeWidth={strokeWidth}
-        />
-      </g>
-
-      {/* Top left corner */}
-      <g
-        style={{
-          transform: `translateY(${topAnim.yOffset}px)`,
-          opacity: topAnim.opacity,
-        }}
-      >
-        <line
-          x1={left}
-          y1={top + cornerLength}
-          x2={left}
-          y2={top}
-          stroke={COLORS.silver}
-          strokeWidth={strokeWidth}
-        />
-        <line
-          x1={left}
-          y1={top}
-          x2={left + cornerLength}
-          y2={top}
-          stroke={COLORS.silver}
-          strokeWidth={strokeWidth}
-        />
-      </g>
-
-      {/* Top right corner */}
-      <g
-        style={{
-          transform: `translateY(${topAnim.yOffset}px)`,
-          opacity: topAnim.opacity,
-        }}
-      >
-        <line
-          x1={right - cornerLength}
-          y1={top}
-          x2={right}
-          y2={top}
-          stroke={COLORS.silver}
-          strokeWidth={strokeWidth}
-        />
-        <line
-          x1={right}
-          y1={top}
-          x2={right}
-          y2={top + cornerLength}
-          stroke={COLORS.silver}
-          strokeWidth={strokeWidth}
-        />
-      </g>
+      {lines.map(([x1, y1, x2, y2, animIndex], i) => {
+        const anim = lineAnims[animIndex];
+        return (
+          <line
+            key={i}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke={COLORS.silver}
+            strokeWidth={strokeWidth}
+            style={{
+              transform: `translateY(${anim.yOffset}px)`,
+              opacity: anim.opacity,
+            }}
+          />
+        );
+      })}
     </svg>
   );
 };
