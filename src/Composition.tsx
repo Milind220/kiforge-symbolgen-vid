@@ -9,6 +9,15 @@ const WORD_STAGGER = 3; // Frames between each word appearing (overlap with prev
 const EASE_DURATION = 5; // Total frames to ease into final position
 const WORD_START_OFFSET = 25; // Pixels below final position when appearing
 
+// Symbol frame timing (starts after all wordlets are in position)
+const LAST_WORDLET_INDEX = 8;
+const WORDLETS_DONE_FRAME =
+  FIRST_WORD_APPEAR + LAST_WORDLET_INDEX * WORD_STAGGER + EASE_DURATION; // Frame 39
+const SYMBOL_FRAME_START = WORDLETS_DONE_FRAME + 2; // Small pause, then frame starts
+const SYMBOL_FRAME_EASE_DURATION = 5; // 5 frames to whizz into position
+const SYMBOL_FRAME_START_OFFSET = 400; // Start far outside frame (whizz in effect)
+const SYMBOL_FRAME_STAGGER = 2; // Frames between bottom and top groups
+
 // =============================================================================
 // WORDLET DATA
 // =============================================================================
@@ -31,6 +40,7 @@ const WORDLETS = [
 const COLORS = {
   background: "#000000",
   text: "#ffffff",
+  silver: "#adadad",
 } as const;
 
 const FONTS = {
@@ -39,6 +49,17 @@ const FONTS = {
 
 const TYPOGRAPHY = {
   fontSize: 56,
+} as const;
+
+// Symbol frame dimensions
+const SYMBOL_FRAME = {
+  width: 180,
+  height: 260,
+  cornerLength: 40, // Length of corner bracket arms
+  strokeWidth: 3,
+  // Position offset from center (to the right of "symbols" word)
+  offsetX: 120,
+  offsetY: -20,
 } as const;
 
 // =============================================================================
@@ -84,6 +105,176 @@ const getWordletAnimation = (
   };
 };
 
+// Get symbol frame line animation (whizz in from below)
+// groupIndex: 0 = bottom lines (first), 1 = top lines (second)
+const getSymbolLineAnimation = (
+  frame: number,
+  groupIndex: number
+): { yOffset: number; opacity: number } => {
+  const appearFrame = SYMBOL_FRAME_START + groupIndex * SYMBOL_FRAME_STAGGER;
+
+  // Line hasn't appeared yet
+  if (frame < appearFrame) {
+    return { yOffset: SYMBOL_FRAME_START_OFFSET, opacity: 0 };
+  }
+
+  const framesSinceAppear = frame - appearFrame;
+
+  // Line is fully in position
+  if (framesSinceAppear >= SYMBOL_FRAME_EASE_DURATION) {
+    return { yOffset: 0, opacity: 1 };
+  }
+
+  // Whizz in: strong ease-out for fast entry that decelerates
+  const progress = interpolate(
+    framesSinceAppear,
+    [0, SYMBOL_FRAME_EASE_DURATION],
+    [0, 1],
+    { extrapolateRight: "clamp" }
+  );
+  // Use aggressive bezier curve for whizz effect (fast start, strong deceleration)
+  const easedProgress = Easing.bezier(0.22, 1, 0.36, 1)(progress);
+
+  return {
+    yOffset: SYMBOL_FRAME_START_OFFSET * (1 - easedProgress),
+    opacity: 1,
+  };
+};
+
+// =============================================================================
+// SYMBOL FRAME COMPONENT
+// =============================================================================
+
+const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
+  const { width, height, cornerLength, strokeWidth, offsetX, offsetY } =
+    SYMBOL_FRAME;
+
+  // Bottom lines animate first (group 0), top lines second (group 1)
+  const bottomAnim = getSymbolLineAnimation(frame, 0);
+  const topAnim = getSymbolLineAnimation(frame, 1);
+
+  // Calculate corner positions
+  const left = -width / 2;
+  const right = width / 2;
+  const top = -height / 2;
+  const bottom = height / 2;
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`${left} ${top} ${width} ${height}`}
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`,
+        overflow: "visible",
+      }}
+    >
+      {/* Bottom left corner */}
+      <g
+        style={{
+          transform: `translateY(${bottomAnim.yOffset}px)`,
+          opacity: bottomAnim.opacity,
+        }}
+      >
+        <line
+          x1={left}
+          y1={bottom - cornerLength}
+          x2={left}
+          y2={bottom}
+          stroke={COLORS.silver}
+          strokeWidth={strokeWidth}
+        />
+        <line
+          x1={left}
+          y1={bottom}
+          x2={left + cornerLength}
+          y2={bottom}
+          stroke={COLORS.silver}
+          strokeWidth={strokeWidth}
+        />
+      </g>
+
+      {/* Bottom right corner */}
+      <g
+        style={{
+          transform: `translateY(${bottomAnim.yOffset}px)`,
+          opacity: bottomAnim.opacity,
+        }}
+      >
+        <line
+          x1={right - cornerLength}
+          y1={bottom}
+          x2={right}
+          y2={bottom}
+          stroke={COLORS.silver}
+          strokeWidth={strokeWidth}
+        />
+        <line
+          x1={right}
+          y1={bottom}
+          x2={right}
+          y2={bottom - cornerLength}
+          stroke={COLORS.silver}
+          strokeWidth={strokeWidth}
+        />
+      </g>
+
+      {/* Top left corner */}
+      <g
+        style={{
+          transform: `translateY(${topAnim.yOffset}px)`,
+          opacity: topAnim.opacity,
+        }}
+      >
+        <line
+          x1={left}
+          y1={top + cornerLength}
+          x2={left}
+          y2={top}
+          stroke={COLORS.silver}
+          strokeWidth={strokeWidth}
+        />
+        <line
+          x1={left}
+          y1={top}
+          x2={left + cornerLength}
+          y2={top}
+          stroke={COLORS.silver}
+          strokeWidth={strokeWidth}
+        />
+      </g>
+
+      {/* Top right corner */}
+      <g
+        style={{
+          transform: `translateY(${topAnim.yOffset}px)`,
+          opacity: topAnim.opacity,
+        }}
+      >
+        <line
+          x1={right - cornerLength}
+          y1={top}
+          x2={right}
+          y2={top}
+          stroke={COLORS.silver}
+          strokeWidth={strokeWidth}
+        />
+        <line
+          x1={right}
+          y1={top}
+          x2={right}
+          y2={top + cornerLength}
+          stroke={COLORS.silver}
+          strokeWidth={strokeWidth}
+        />
+      </g>
+    </svg>
+  );
+};
+
 // =============================================================================
 // MAIN COMPOSITION
 // =============================================================================
@@ -104,6 +295,10 @@ export const MyComposition: React.FC = () => {
         alignItems: "center",
       }}
     >
+      {/* Symbol frame (behind text) */}
+      <SymbolFrame frame={frame} />
+
+      {/* Text */}
       <div
         style={{
           fontSize: TYPOGRAPHY.fontSize,
