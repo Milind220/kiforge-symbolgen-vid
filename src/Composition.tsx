@@ -13,7 +13,8 @@ const WORD_START_OFFSET = 25; // Pixels below final position when appearing
 const LAST_WORDLET_INDEX = 8;
 const WORDLETS_DONE_FRAME =
   FIRST_WORD_APPEAR + LAST_WORDLET_INDEX * WORD_STAGGER + EASE_DURATION; // Frame 39
-const SYMBOL_FRAME_START = WORDLETS_DONE_FRAME + 2; // Small pause, then frame starts
+const SYMBOL_FRAME_DELAY = 0; // Frames to wait after wordlets done (adjustable keyframe)
+const SYMBOL_FRAME_START = WORDLETS_DONE_FRAME + SYMBOL_FRAME_DELAY;
 const SYMBOL_FRAME_EASE_DURATION = 5; // 5 frames to whizz into position
 const SYMBOL_FRAME_START_OFFSET = 400; // Start far outside frame (whizz in effect)
 const SYMBOL_LINE_STAGGER = 1; // Frames between each line element
@@ -54,7 +55,7 @@ const TYPOGRAPHY = {
 // Symbol frame dimensions (centered around text)
 const SYMBOL_FRAME = {
   width: 240,
-  height: 320,
+  height: 200, // Reduced to sit closer to the text
   verticalArmLength: 50, // Length of vertical line segments
   strokeWidth: 5,
 } as const;
@@ -159,15 +160,18 @@ const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
   const top = -height / 2;
   const bottom = height / 2;
 
+  // Extend horizontal lines by half stroke width for clean 90° corners
+  const cornerOverlap = strokeWidth / 2;
+
   // Line definitions: [x1, y1, x2, y2, animIndex]
   const lines: [number, number, number, number, number][] = [
     // Bottom group (animate first)
     [left, bottom - verticalArmLength, left, bottom, 0], // Bottom left vertical
-    [left, bottom, right, bottom, 1], // Bottom horizontal
+    [left - cornerOverlap, bottom, right + cornerOverlap, bottom, 1], // Bottom horizontal (extended)
     [right, bottom - verticalArmLength, right, bottom, 2], // Bottom right vertical
     // Top group (animate second)
     [left, top, left, top + verticalArmLength, 3], // Top left vertical
-    [left, top, right, top, 4], // Top horizontal
+    [left - cornerOverlap, top, right + cornerOverlap, top, 4], // Top horizontal (extended)
     [right, top, right, top + verticalArmLength, 5], // Top right vertical
   ];
 
