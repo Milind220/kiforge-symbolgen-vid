@@ -78,9 +78,10 @@ const getLetterDistanceFromAttraction = (letterIndex: number): number => {
 };
 
 // Sort letters within each half by distance from their attraction point
-const LEFT_LETTERS = [...Array(Math.floor(CENTER_INDEX)).keys()];
-const RIGHT_LETTERS = [...Array(LETTERS.length - Math.ceil(CENTER_INDEX)).keys()]
-  .map(i => i + Math.ceil(CENTER_INDEX));
+// Left half: indices 0 to 14 (includes center letter)
+// Right half: indices 15 to 29
+const LEFT_LETTERS = [...Array(15).keys()]; // 0-14
+const RIGHT_LETTERS = [...Array(15).keys()].map(i => i + 15); // 15-29
 
 // Sort each half: closest to attraction point first
 LEFT_LETTERS.sort((a, b) =>
