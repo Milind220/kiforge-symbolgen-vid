@@ -29,6 +29,12 @@ const OPENING_TEXT_DISAPPEAR_START = LINE_EXTENSION_START + OPENING_TEXT_DISAPPE
 const LINE_EXTENSION_TOTAL_DURATION = 10; // Frames for furthest letter to reach line
 const LINE_EXTENSION_END = LINE_EXTENSION_START + LINE_EXTENSION_TOTAL_DURATION;
 
+// Grid animation timing
+const GRID_APPEAR_START = SYMBOL_FRAME_DONE - 3; // Start appearing slightly before symbol frame completes
+const GRID_APPEAR_DURATION = 15; // Frames for grid to fade in
+const GRID_ROTATE_START = GRID_APPEAR_START; // Rotation starts immediately with appearance
+const GRID_ROTATE_DURATION = 25; // Frames for rotation from 45° to 0° (slightly longer to overlap with fade-in)
+
 // =============================================================================
 // LETTER DATA
 // =============================================================================
@@ -53,6 +59,7 @@ const COLORS = {
   background: "#000000",
   text: "#ffffff",
   silver: "#adadad",
+  shadowGrey: "#272727",
 } as const;
 
 const FONTS = {
@@ -161,6 +168,136 @@ const getLineExtensionProgress = (frame: number): number => {
 };
 
 // =============================================================================
+// GRID CONSTANTS
+// =============================================================================
+const GRID = {
+  spacing: 80, // Distance between parallel lines
+  strokeWidth: 1.5,
+  // Exclusion zone: coordinate dimensions + strokeWidth (visual bounds) + ~100px breathing room
+  // The strokeWidth extends beyond the coordinate positions, so we account for that
+  exclusionWidth: SYMBOL_FRAME.width + SYMBOL_FRAME.strokeWidth + 105, // 240 + 5 + 105 = 350
+  exclusionHeight: SYMBOL_FRAME.height + SYMBOL_FRAME.strokeWidth + 85, // 200 + 5 + 85 = 290
+} as const;
+
+// =============================================================================
+// DIAGONAL GRID COMPONENT
+// =============================================================================
+
+// Creates a diagonal grid that rotates from 45° to 0° (horizontal/vertical)
+// Lines are clipped to avoid the center exclusion zone
+const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
+  const { spacing, strokeWidth, exclusionWidth, exclusionHeight } = GRID;
+
+  // Calculate grid appearance (fade in)
+  const appearProgress = interpolate(
+    frame,
+    [GRID_APPEAR_START, GRID_APPEAR_START + GRID_APPEAR_DURATION],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+  );
+
+  // Calculate rotation (45° to 0°, clockwise)
+  const rotationProgress = interpolate(
+    frame,
+    [GRID_ROTATE_START, GRID_ROTATE_START + GRID_ROTATE_DURATION],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+  );
+  const easedRotation = Easing.inOut(Easing.cubic)(rotationProgress);
+  const rotation = interpolate(easedRotation, [0, 1], [45, 0]);
+
+  // Color interpolation from black to shadow-grey
+  const colorProgress = appearProgress;
+  const r = Math.round(interpolate(colorProgress, [0, 1], [0, 0x27]));
+  const g = Math.round(interpolate(colorProgress, [0, 1], [0, 0x27]));
+  const b = Math.round(interpolate(colorProgress, [0, 1], [0, 0x27]));
+  const gridColor = `rgb(${r}, ${g}, ${b})`;
+
+  // Don't render if not yet visible
+  if (appearProgress <= 0) return null;
+
+  // Grid dimensions (must be large enough to cover viewport at any rotation)
+  // At 45° rotation, we need sqrt(2) * diagonal of viewport
+  // Viewport diagonal = sqrt(1920² + 1080²) ≈ 2203, so we need ~3115 minimum
+  const viewportSize = 4000; // Large enough to cover all corners at any angle
+  const halfView = viewportSize / 2;
+
+  // Generate line positions (centered on 0,0)
+  const lineCount = Math.ceil(viewportSize / spacing) + 2;
+  const linePositions: number[] = [];
+  for (let i = -lineCount; i <= lineCount; i++) {
+    linePositions.push(i * spacing);
+  }
+
+  // Exclusion zone bounds (rectangle in center)
+  const exHalfW = exclusionWidth / 2;
+  const exHalfH = exclusionHeight / 2;
+
+  return (
+    <svg
+      width="100%"
+      height="100%"
+      viewBox="-960 -540 1920 1080"
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        opacity: appearProgress,
+        overflow: "hidden",
+      }}
+    >
+      {/* Define clip path that excludes the center rectangle - applied at SVG level so it doesn't rotate */}
+      <defs>
+        <clipPath id="grid-clip">
+          {/* Full viewport minus center exclusion */}
+          <path
+            d={`
+              M -960 -540 L 960 -540 L 960 540 L -960 540 Z
+              M ${-exHalfW} ${-exHalfH} 
+              L ${-exHalfW} ${exHalfH} 
+              L ${exHalfW} ${exHalfH} 
+              L ${exHalfW} ${-exHalfH} Z
+            `}
+            fillRule="evenodd"
+          />
+        </clipPath>
+      </defs>
+
+      {/* Clipped container (doesn't rotate) - clips to viewport with center exclusion */}
+      <g clipPath="url(#grid-clip)">
+        {/* Rotating grid container */}
+        <g transform={`rotate(${rotation})`}>
+          {/* Lines in one direction (will be at 45° initially, 0° after rotation) */}
+          {linePositions.map((pos, i) => (
+            <line
+              key={`h-${i}`}
+              x1={-halfView}
+              y1={pos}
+              x2={halfView}
+              y2={pos}
+              stroke={gridColor}
+              strokeWidth={strokeWidth}
+            />
+          ))}
+          {/* Lines in perpendicular direction (will be at 135° initially, 90° after rotation) */}
+          {linePositions.map((pos, i) => (
+            <line
+              key={`v-${i}`}
+              x1={pos}
+              y1={-halfView}
+              x2={pos}
+              y2={halfView}
+              stroke={gridColor}
+              strokeWidth={strokeWidth}
+            />
+          ))}
+        </g>
+      </g>
+    </svg>
+  );
+};
+
+// =============================================================================
 // SYMBOL FRAME COMPONENT
 // =============================================================================
 
@@ -259,6 +396,9 @@ export const MyComposition: React.FC = () => {
         alignItems: "center",
       }}
     >
+      {/* Diagonal grid (behind everything) */}
+      <DiagonalGrid frame={frame} />
+
       {/* Symbol frame (behind text) */}
       <SymbolFrame frame={frame} />
 
