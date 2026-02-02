@@ -21,9 +21,16 @@ const SYMBOL_LINE_STAGGER = 1; // Frames between each line element
 const SYMBOL_FRAME_DONE =
   SYMBOL_FRAME_START + 5 * SYMBOL_LINE_STAGGER + SYMBOL_FRAME_EASE_DURATION; // All 6 lines in place
 
-// Text disappear timing
-const TEXT_DISAPPEAR_DELAY = 2; // Frames to wait after symbol frame is complete
-const TEXT_DISAPPEAR_FRAME = SYMBOL_FRAME_DONE + TEXT_DISAPPEAR_DELAY; // Text pops out when symbol frame is complete
+// Text suck-in / line extension animation timing
+const SUCK_IN_DELAY = 2; // Frames to wait after symbol frame is complete
+const SUCK_IN_START = SYMBOL_FRAME_DONE + SUCK_IN_DELAY; // When lines start extending & text starts moving
+const SUCK_IN_DURATION = 12; // Frames for the suck-in animation
+const SUCK_IN_END = SUCK_IN_START + SUCK_IN_DURATION;
+
+// Which wordlets go left (rest go right)
+// Left: "Still", " draw", "ing", " sym" (indices 0-3)
+// Right: "bols", " by", " ha", "nd", "?" (indices 4-8)
+const LEFT_WORDLETS = [0, 1, 2, 3];
 
 // =============================================================================
 // WORDLET DATA
@@ -145,6 +152,55 @@ const getSymbolLineAnimation = (
   };
 };
 
+// Get line extension progress (0 = arm length, 1 = full height)
+const getLineExtensionProgress = (frame: number): number => {
+  if (frame < SUCK_IN_START) return 0;
+  if (frame >= SUCK_IN_END) return 1;
+
+  const progress = interpolate(
+    frame,
+    [SUCK_IN_START, SUCK_IN_END],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+  );
+  // Smooth ease for line drawing
+  return Easing.inOut(Easing.cubic)(progress);
+};
+
+// Get text suck-in animation
+const getTextSuckInAnimation = (
+  frame: number,
+  wordletIndex: number
+): { xOffset: number; opacity: number; scale: number } => {
+  // Before suck-in starts, no offset
+  if (frame < SUCK_IN_START) {
+    return { xOffset: 0, opacity: 1, scale: 1 };
+  }
+
+  // After suck-in ends, text is gone
+  if (frame >= SUCK_IN_END) {
+    return { xOffset: 0, opacity: 0, scale: 0 };
+  }
+
+  const progress = interpolate(
+    frame,
+    [SUCK_IN_START, SUCK_IN_END],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+  );
+  const easedProgress = Easing.in(Easing.cubic)(progress);
+
+  // Determine direction: left wordlets go left, right wordlets go right
+  const isLeftWordlet = LEFT_WORDLETS.includes(wordletIndex);
+  const targetX = isLeftWordlet ? -SYMBOL_FRAME.width / 2 - 50 : SYMBOL_FRAME.width / 2 + 50;
+
+  return {
+    xOffset: targetX * easedProgress,
+    opacity: 1 - easedProgress,
+    scale: 1 - easedProgress * 0.5,
+  };
+};
+
 // =============================================================================
 // SYMBOL FRAME COMPONENT
 // =============================================================================
@@ -152,6 +208,7 @@ const getSymbolLineAnimation = (
 // 6 lines, each animates independently:
 // Bottom group (indices 0-2): left vertical, horizontal, right vertical
 // Top group (indices 3-5): left vertical, horizontal, right vertical
+// After suck-in starts, left top extends down and right bottom extends up
 const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
   const { width, height, verticalArmLength, strokeWidth } = SYMBOL_FRAME;
 
@@ -159,6 +216,9 @@ const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
   const lineAnims = Array.from({ length: 6 }, (_, i) =>
     getSymbolLineAnimation(frame, i)
   );
+
+  // Get line extension progress
+  const extensionProgress = getLineExtensionProgress(frame);
 
   // Calculate positions
   const left = -width / 2;
@@ -169,16 +229,22 @@ const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
   // Extend horizontal lines by half stroke width for clean 90° corners
   const cornerOverlap = strokeWidth / 2;
 
+  // Calculate how far the extending lines should go
+  // Gap between top arm end and bottom arm start
+  const gap = height - 2 * verticalArmLength;
+  const extensionAmount = gap * extensionProgress;
+
   // Line definitions: [x1, y1, x2, y2, animIndex]
+  // Note: Left top vertical extends DOWN, right bottom vertical extends UP
   const lines: [number, number, number, number, number][] = [
     // Bottom group (animate first)
-    [left, bottom - verticalArmLength, left, bottom, 0], // Bottom left vertical
-    [left - cornerOverlap, bottom, right + cornerOverlap, bottom, 1], // Bottom horizontal (extended)
-    [right, bottom - verticalArmLength, right, bottom, 2], // Bottom right vertical
+    [left, bottom - verticalArmLength, left, bottom, 0], // Bottom left vertical (static)
+    [left - cornerOverlap, bottom, right + cornerOverlap, bottom, 1], // Bottom horizontal
+    [right, bottom - verticalArmLength - extensionAmount, right, bottom, 2], // Bottom right vertical (extends UP)
     // Top group (animate second)
-    [left, top, left, top + verticalArmLength, 3], // Top left vertical
-    [left - cornerOverlap, top, right + cornerOverlap, top, 4], // Top horizontal (extended)
-    [right, top, right, top + verticalArmLength, 5], // Top right vertical
+    [left, top, left, top + verticalArmLength + extensionAmount, 3], // Top left vertical (extends DOWN)
+    [left - cornerOverlap, top, right + cornerOverlap, top, 4], // Top horizontal
+    [right, top, right, top + verticalArmLength, 5], // Top right vertical (static)
   ];
 
   return (
@@ -223,12 +289,17 @@ const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
 export const MyComposition: React.FC = () => {
   const frame = useCurrentFrame();
 
-  // Text visibility (pops out instantly)
-  const textVisible = frame < TEXT_DISAPPEAR_FRAME;
+  // Text visibility (hidden after suck-in completes)
+  const textVisible = frame < SUCK_IN_END;
 
   // Get animation state for each wordlet
   const wordletAnimations = WORDLETS.map((_, index) =>
     getWordletAnimation(frame, index)
+  );
+
+  // Get suck-in animation for each wordlet
+  const suckInAnimations = WORDLETS.map((_, index) =>
+    getTextSuckInAnimation(frame, index)
   );
 
   return (
@@ -242,7 +313,7 @@ export const MyComposition: React.FC = () => {
       {/* Symbol frame (behind text) */}
       <SymbolFrame frame={frame} />
 
-      {/* Text - disappears instantly at TEXT_DISAPPEAR_FRAME */}
+      {/* Text - gets sucked into the extending lines */}
       {textVisible && (
         <div
           style={{
@@ -252,15 +323,16 @@ export const MyComposition: React.FC = () => {
           }}
         >
           {WORDLETS.map((wordlet, index) => {
-            const anim = wordletAnimations[index];
+            const enterAnim = wordletAnimations[index];
+            const suckIn = suckInAnimations[index];
 
             return (
               <span
                 key={index}
                 style={{
                   display: "inline-block",
-                  transform: `translateY(${anim.yOffset}px)`,
-                  opacity: anim.opacity,
+                  transform: `translateY(${enterAnim.yOffset}px) translateX(${suckIn.xOffset}px) scale(${suckIn.scale})`,
+                  opacity: enterAnim.opacity * suckIn.opacity,
                   whiteSpace: "pre",
                 }}
               >
