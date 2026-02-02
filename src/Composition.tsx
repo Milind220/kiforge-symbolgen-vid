@@ -24,8 +24,7 @@ const SYMBOL_FRAME_DONE =
 // Text suck-in / line extension animation timing
 const SUCK_IN_DELAY = 2; // Frames to wait after symbol frame is complete
 const SUCK_IN_START = SYMBOL_FRAME_DONE + SUCK_IN_DELAY; // When lines start extending & text starts moving
-const SUCK_IN_TOTAL_DURATION = 10; // Total frames for entire suck-in animation
-const LETTER_SUCK_DURATION = 6; // Frames for each letter's individual animation
+const SUCK_IN_TOTAL_DURATION = 10; // Frames for furthest letter to reach line
 const SUCK_IN_END = SUCK_IN_START + SUCK_IN_TOTAL_DURATION;
 
 // =============================================================================
@@ -44,76 +43,6 @@ const getWordletIndex = (letterIndex: number): number => {
     if (letterIndex >= WORDLET_BOUNDARIES[i]) return i;
   }
   return 0;
-};
-
-// Attraction points (relative to text center):
-// - Green dot (top-center): where left-half letters get sucked to
-// - Pink dot (bottom-center): where right-half letters get sucked to
-// These are approximately at the tips of the extending vertical lines
-const ATTRACTION_LEFT_X = -50;
-const ATTRACTION_LEFT_Y = -80;
-const ATTRACTION_RIGHT_X = 80;
-const ATTRACTION_RIGHT_Y = 80;
-
-// Calculate each letter's distance from its attraction point
-// Left half (indices 0-14) attracted to green dot (top)
-// Right half (indices 15-29) attracted to pink dot (bottom)
-const getLetterDistanceFromAttraction = (letterIndex: number): number => {
-  const isLeftHalf = letterIndex < CENTER_INDEX;
-  // Approximate X position of letter relative to center (each letter ~20px wide)
-  const letterX = (letterIndex - CENTER_INDEX) * 18;
-  const letterY = 0; // Letters are on the horizontal center line
-
-  if (isLeftHalf) {
-    // Distance to green dot (top-center)
-    const dx = letterX - ATTRACTION_LEFT_X;
-    const dy = letterY - ATTRACTION_LEFT_Y;
-    return Math.sqrt(dx * dx + dy * dy);
-  } else {
-    // Distance to pink dot (bottom-center)
-    const dx = letterX - ATTRACTION_RIGHT_X;
-    const dy = letterY - ATTRACTION_RIGHT_Y;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-};
-
-// Sort letters within each half by distance from their attraction point
-// Left half: indices 0 to 14 (includes center letter)
-// Right half: indices 15 to 29
-const LEFT_LETTERS = [...Array(15).keys()]; // 0-14
-const RIGHT_LETTERS = [...Array(15).keys()].map(i => i + 15); // 15-29
-
-// Sort each half: closest to attraction point first
-LEFT_LETTERS.sort((a, b) =>
-  getLetterDistanceFromAttraction(a) - getLetterDistanceFromAttraction(b)
-);
-RIGHT_LETTERS.sort((a, b) =>
-  getLetterDistanceFromAttraction(a) - getLetterDistanceFromAttraction(b)
-);
-
-// Interleave left and right letters for combined order
-const SUCK_ORDER_LIST: number[] = [];
-const maxLen = Math.max(LEFT_LETTERS.length, RIGHT_LETTERS.length);
-for (let i = 0; i < maxLen; i++) {
-  if (i < LEFT_LETTERS.length) SUCK_ORDER_LIST.push(LEFT_LETTERS[i]);
-  if (i < RIGHT_LETTERS.length) SUCK_ORDER_LIST.push(RIGHT_LETTERS[i]);
-}
-
-// Map letter index to its suck-in order
-const SUCK_ORDER: Record<number, number> = {};
-SUCK_ORDER_LIST.forEach((letterIdx, order) => {
-  SUCK_ORDER[letterIdx] = order;
-});
-
-// Calculate stagger delay - letters closer to attraction start first
-// Uses accelerating curve so pickup rate increases
-const getSuckInDelay = (letterIndex: number): number => {
-  const order = SUCK_ORDER[letterIndex];
-  const totalLetters = LETTERS.length;
-  const normalizedOrder = order / (totalLetters - 1); // 0 to 1
-  // Accelerating: early letters have bigger gaps, later ones bunch up fast
-  const staggerTime = SUCK_IN_TOTAL_DURATION - LETTER_SUCK_DURATION;
-  return staggerTime * Math.pow(normalizedOrder, 0.5);
 };
 
 // =============================================================================
@@ -140,6 +69,37 @@ const SYMBOL_FRAME = {
   verticalArmLength: 50, // Length of vertical line segments
   strokeWidth: 5,
 } as const;
+
+// =============================================================================
+// LETTER SUCK-IN CALCULATIONS
+// =============================================================================
+// Letter spacing (approximate width per character at this font size)
+const LETTER_WIDTH = 18;
+
+// Calculate letter's X position relative to screen center
+const getLetterX = (letterIndex: number): number =>
+  (letterIndex - CENTER_INDEX) * LETTER_WIDTH;
+
+// Target X positions: the vertical lines of the symbol frame
+// Left half letters go to left line, right half go to right line
+const LEFT_LINE_X = -SYMBOL_FRAME.width / 2; // -120
+const RIGHT_LINE_X = SYMBOL_FRAME.width / 2; // 120
+
+// Calculate distance each letter must travel to reach its target line
+const getLetterDistance = (letterIndex: number): number => {
+  const letterX = getLetterX(letterIndex);
+  const isLeftHalf = letterIndex < CENTER_INDEX;
+  const targetX = isLeftHalf ? LEFT_LINE_X : RIGHT_LINE_X;
+  return Math.abs(targetX - letterX);
+};
+
+// Find the maximum distance any letter needs to travel (for speed calculation)
+const MAX_LETTER_DISTANCE = Math.max(
+  ...LETTERS.map((_, i) => getLetterDistance(i))
+);
+
+// All letters move at same speed - furthest letter takes full duration
+const SUCK_SPEED = MAX_LETTER_DISTANCE / SUCK_IN_TOTAL_DURATION;
 
 // =============================================================================
 // HELPERS
@@ -236,52 +196,34 @@ const getLineExtensionProgress = (frame: number): number => {
 };
 
 // Get letter suck-in animation
+// Letters move horizontally toward their target line and disappear on contact
 const getLetterSuckInAnimation = (
   frame: number,
   letterIndex: number
-): { xOffset: number; yOffset: number; opacity: number; scale: number } => {
-  // Get this letter's staggered start time
-  const letterDelay = getSuckInDelay(letterIndex);
-  const letterStart = SUCK_IN_START + letterDelay;
-  const letterEnd = letterStart + LETTER_SUCK_DURATION;
-
-  // Before this letter's suck-in starts
-  if (frame < letterStart) {
-    return { xOffset: 0, yOffset: 0, opacity: 1, scale: 1 };
+): { xOffset: number; opacity: number } => {
+  // Before suck-in starts
+  if (frame < SUCK_IN_START) {
+    return { xOffset: 0, opacity: 1 };
   }
 
-  // After this letter's suck-in ends
-  if (frame >= letterEnd) {
-    return { xOffset: 0, yOffset: 0, opacity: 0, scale: 0 };
-  }
-
-  const progress = interpolate(
-    frame,
-    [letterStart, letterEnd],
-    [0, 1],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-  );
-  // Ease-in: slow start, fast end (gravity effect)
-  const easedProgress = Easing.in(Easing.quad)(progress);
-
-  // Calculate letter's current X position relative to center
-  const letterX = (letterIndex - CENTER_INDEX) * 18;
-
-  // Determine which attraction point this letter goes to
   const isLeftHalf = letterIndex < CENTER_INDEX;
+  const distance = getLetterDistance(letterIndex);
 
-  // Target is the attraction point (green dot for left, pink dot for right)
-  const targetX = isLeftHalf
-    ? ATTRACTION_LEFT_X - letterX // Move to green dot X
-    : ATTRACTION_RIGHT_X - letterX; // Move to pink dot X
-  const targetY = isLeftHalf ? ATTRACTION_LEFT_Y : ATTRACTION_RIGHT_Y;
+  // Calculate how far this letter has moved
+  const framesSinceStart = frame - SUCK_IN_START;
+  const distanceTraveled = framesSinceStart * SUCK_SPEED;
 
-  return {
-    xOffset: targetX * easedProgress,
-    yOffset: targetY * easedProgress,
-    opacity: 1 - easedProgress,
-    scale: 1 - easedProgress * 0.5,
-  };
+  // Letter has reached the line - disappear instantly
+  if (distanceTraveled >= distance) {
+    return { xOffset: 0, opacity: 0 };
+  }
+
+  // Calculate X offset (direction depends on which half)
+  // Left half moves left (negative), right half moves right (positive)
+  const direction = isLeftHalf ? -1 : 1;
+  const xOffset = direction * distanceTraveled;
+
+  return { xOffset, opacity: 1 };
 };
 
 // =============================================================================
@@ -399,15 +341,12 @@ export const MyComposition: React.FC = () => {
             const enterAnim = getLetterEntranceAnimation(frame, index);
             const suckIn = getLetterSuckInAnimation(frame, index);
 
-            // Combine Y offsets: enter animation + suck-in animation
-            const totalYOffset = enterAnim.yOffset + suckIn.yOffset;
-
             return (
               <span
                 key={index}
                 style={{
                   display: "inline-block",
-                  transform: `translate(${suckIn.xOffset}px, ${totalYOffset}px) scale(${suckIn.scale})`,
+                  transform: `translate(${suckIn.xOffset}px, ${enterAnim.yOffset}px)`,
                   opacity: enterAnim.opacity * suckIn.opacity,
                   whiteSpace: "pre",
                 }}
