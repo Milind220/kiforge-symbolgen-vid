@@ -50,10 +50,10 @@ const getWordletIndex = (letterIndex: number): number => {
 // - Green dot (top-center): where left-half letters get sucked to
 // - Pink dot (bottom-center): where right-half letters get sucked to
 // These are approximately at the tips of the extending vertical lines
-const ATTRACTION_LEFT_X = -20; // Slightly left of center (green dot X)
-const ATTRACTION_LEFT_Y = -80; // Top (green dot Y)
-const ATTRACTION_RIGHT_X = 20; // Slightly right of center (pink dot X)
-const ATTRACTION_RIGHT_Y = 80; // Bottom (pink dot Y)
+const ATTRACTION_LEFT_X = -50;
+const ATTRACTION_LEFT_Y = -80;
+const ATTRACTION_RIGHT_X = 80;
+const ATTRACTION_RIGHT_Y = 80;
 
 // Calculate each letter's distance from its attraction point
 // Left half (indices 0-14) attracted to green dot (top)
