@@ -314,8 +314,8 @@ const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
 export const MyComposition: React.FC = () => {
   const frame = useCurrentFrame();
 
-  // Text visibility (hidden after suck-in completes)
-  const textVisible = frame < SUCK_IN_END;
+  // Text visibility (hidden instantly when line extension starts)
+  const textVisible = frame < SUCK_IN_START;
 
   return (
     <AbsoluteFill
