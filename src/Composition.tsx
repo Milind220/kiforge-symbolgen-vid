@@ -1,4 +1,10 @@
-import { AbsoluteFill, useCurrentFrame, interpolate, Easing } from "remotion";
+import {
+  AbsoluteFill,
+  useCurrentFrame,
+  interpolate,
+  Easing,
+  useVideoConfig,
+} from "remotion";
 
 // =============================================================================
 // TIMING CONSTANTS (in frames)
@@ -71,11 +77,11 @@ const TYPOGRAPHY = {
 } as const;
 
 // Symbol frame dimensions (centered around text)
-// Sized to be exactly 4×4 grid increments (240px at 60px spacing)
+// Sized to be exactly 6×6 grid increments (240px at 40px spacing)
 const SYMBOL_FRAME = {
   width: 240,
-  height: 240, // Square to align with grid (4 increments)
-  verticalArmLength: 60, // Length of vertical line segments (1 grid increment)
+  height: 240, // Square to align with grid (6 increments)
+  verticalArmLength: 60, // Length of vertical line segments (1.5 grid increments)
   strokeWidth: 5,
 } as const;
 
@@ -172,12 +178,12 @@ const getLineExtensionProgress = (frame: number): number => {
 // GRID CONSTANTS
 // =============================================================================
 const GRID = {
-  spacing: 60, // Distance between parallel lines (symbol frame = 4×4 increments)
+  spacing: 40, // Distance between parallel lines in pixels (symbol frame = 6×6 increments)
   strokeWidth: 1.5,
   // Exclusion zone: coordinate dimensions + strokeWidth (visual bounds) + ~100px breathing room
   // The strokeWidth extends beyond the coordinate positions, so we account for that
-  exclusionWidth: SYMBOL_FRAME.width + SYMBOL_FRAME.strokeWidth + 105, // 240 + 5 + 105 = 350
-  exclusionHeight: SYMBOL_FRAME.height + SYMBOL_FRAME.strokeWidth + 105, // 240 + 5 + 105 = 350 (now square)
+  exclusionWidth: SYMBOL_FRAME.width + SYMBOL_FRAME.strokeWidth, // 240 + 5 + 105 = 350
+  exclusionHeight: SYMBOL_FRAME.height + SYMBOL_FRAME.strokeWidth, // 240 + 5 + 105 = 350 (now square)
 } as const;
 
 // =============================================================================
@@ -188,6 +194,7 @@ const GRID = {
 // Lines are clipped to avoid the center exclusion zone
 const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
   const { spacing, strokeWidth, exclusionWidth, exclusionHeight } = GRID;
+  const { width: compW, height: compH } = useVideoConfig();
 
   // Calculate grid appearance (fade in)
   const appearProgress = interpolate(
@@ -219,8 +226,8 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
 
   // Grid dimensions (must be large enough to cover viewport at any rotation)
   // At 45° rotation, we need sqrt(2) * diagonal of viewport
-  // Viewport diagonal = sqrt(1920² + 1080²) ≈ 2203, so we need ~3115 minimum
-  const viewportSize = 4000; // Large enough to cover all corners at any angle
+  // Viewport diagonal = sqrt(1280² + 720²) ≈ 1469, so we need ~2078 minimum
+  const viewportSize = 3000; // Large enough to cover all corners at any angle
   const halfView = viewportSize / 2;
 
   // Generate line positions (centered on 0,0)
@@ -234,11 +241,15 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
   const exHalfW = exclusionWidth / 2;
   const exHalfH = exclusionHeight / 2;
 
+  // ViewBox matches composition dimensions exactly (1:1 pixel mapping)
+  const halfW = compW / 2;
+  const halfH = compH / 2;
+
   return (
     <svg
       width="100%"
       height="100%"
-      viewBox="-960 -540 1920 1080"
+      viewBox={`${-halfW} ${-halfH} ${compW} ${compH}`}
       style={{
         position: "absolute",
         left: 0,
@@ -253,7 +264,7 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
           {/* Full viewport minus center exclusion */}
           <path
             d={`
-              M -960 -540 L 960 -540 L 960 540 L -960 540 Z
+              M ${-halfW} ${-halfH} L ${halfW} ${-halfH} L ${halfW} ${halfH} L ${-halfW} ${halfH} Z
               M ${-exHalfW} ${-exHalfH} 
               L ${-exHalfW} ${exHalfH} 
               L ${exHalfW} ${exHalfH} 
