@@ -27,10 +27,23 @@ const SUCK_IN_START = SYMBOL_FRAME_DONE + SUCK_IN_DELAY; // When lines start ext
 const SUCK_IN_DURATION = 12; // Frames for the suck-in animation
 const SUCK_IN_END = SUCK_IN_START + SUCK_IN_DURATION;
 
-// Which wordlets go left (rest go right)
-// Left: "Still", " draw", "ing", " sym" (indices 0-3)
-// Right: "bols", " by", " ha", "nd", "?" (indices 4-8)
-const LEFT_WORDLETS = [0, 1, 2, 3];
+// Suck-in target positions for each wordlet (relative to their starting position)
+// Left side wordlets get sucked into the TOP-LEFT extending line (which goes DOWN)
+// Right side wordlets get sucked into the BOTTOM-RIGHT extending line (which goes UP)
+// Format: [xOffset, yOffset] - where the wordlet ends up relative to start
+const SUCK_IN_TARGETS: Record<number, [number, number]> = {
+  // Left side → sucked UP into top-left vertical line
+  0: [120, -80],   // "Still" → right and up (toward center-top)
+  1: [80, -80],    // " draw" → right and up
+  2: [0, -100],    // "ing" → straight up into the line
+  3: [-60, -80],   // " sym" → left and up (from outside toward line)
+  // Right side → sucked DOWN into bottom-right vertical line
+  4: [60, 80],     // "bols" → right and down (toward line)
+  5: [-40, 100],   // " by" → left and down (inward)
+  6: [-80, 100],   // " ha" → left and down
+  7: [-100, 100],  // "nd" → left and down
+  8: [-120, 80],   // "?" → left and down (from outside)
+};
 
 // =============================================================================
 // WORDLET DATA
@@ -171,15 +184,15 @@ const getLineExtensionProgress = (frame: number): number => {
 const getTextSuckInAnimation = (
   frame: number,
   wordletIndex: number
-): { xOffset: number; opacity: number; scale: number } => {
+): { xOffset: number; yOffset: number; opacity: number; scale: number } => {
   // Before suck-in starts, no offset
   if (frame < SUCK_IN_START) {
-    return { xOffset: 0, opacity: 1, scale: 1 };
+    return { xOffset: 0, yOffset: 0, opacity: 1, scale: 1 };
   }
 
   // After suck-in ends, text is gone
   if (frame >= SUCK_IN_END) {
-    return { xOffset: 0, opacity: 0, scale: 0 };
+    return { xOffset: 0, yOffset: 0, opacity: 0, scale: 0 };
   }
 
   const progress = interpolate(
@@ -188,16 +201,17 @@ const getTextSuckInAnimation = (
     [0, 1],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
-  const easedProgress = Easing.in(Easing.cubic)(progress);
+  // Ease-in: slow start, fast end (gravity effect)
+  const easedProgress = Easing.in(Easing.quad)(progress);
 
-  // Determine direction: left wordlets go left, right wordlets go right
-  const isLeftWordlet = LEFT_WORDLETS.includes(wordletIndex);
-  const targetX = isLeftWordlet ? -SYMBOL_FRAME.width / 2 - 50 : SYMBOL_FRAME.width / 2 + 50;
+  // Get target position for this wordlet
+  const [targetX, targetY] = SUCK_IN_TARGETS[wordletIndex] ?? [0, 0];
 
   return {
     xOffset: targetX * easedProgress,
+    yOffset: targetY * easedProgress,
     opacity: 1 - easedProgress,
-    scale: 1 - easedProgress * 0.5,
+    scale: 1 - easedProgress * 0.6,
   };
 };
 
@@ -326,12 +340,15 @@ export const MyComposition: React.FC = () => {
             const enterAnim = wordletAnimations[index];
             const suckIn = suckInAnimations[index];
 
+            // Combine Y offsets: enter animation + suck-in animation
+            const totalYOffset = enterAnim.yOffset + suckIn.yOffset;
+
             return (
               <span
                 key={index}
                 style={{
                   display: "inline-block",
-                  transform: `translateY(${enterAnim.yOffset}px) translateX(${suckIn.xOffset}px) scale(${suckIn.scale})`,
+                  transform: `translate(${suckIn.xOffset}px, ${totalYOffset}px) scale(${suckIn.scale})`,
                   opacity: enterAnim.opacity * suckIn.opacity,
                   whiteSpace: "pre",
                 }}
