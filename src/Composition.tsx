@@ -24,9 +24,9 @@ const SYMBOL_FRAME_DONE =
 // Text suck-in / line extension animation timing
 const SUCK_IN_DELAY = 2; // Frames to wait after symbol frame is complete
 const SUCK_IN_START = SYMBOL_FRAME_DONE + SUCK_IN_DELAY; // When lines start extending & text starts moving
-const LETTER_SUCK_DURATION = 8; // Frames for each letter's suck-in animation
-const SUCK_IN_TOTAL_STAGGER = 15; // Total frames to stagger all letters (accelerating)
-const SUCK_IN_END = SUCK_IN_START + SUCK_IN_TOTAL_STAGGER + LETTER_SUCK_DURATION; // When last letter finishes
+const SUCK_IN_TOTAL_DURATION = 10; // Total frames for entire suck-in animation
+const LETTER_SUCK_DURATION = 6; // Frames for each letter's individual animation
+const SUCK_IN_END = SUCK_IN_START + SUCK_IN_TOTAL_DURATION;
 
 // =============================================================================
 // LETTER DATA
@@ -34,6 +34,7 @@ const SUCK_IN_END = SUCK_IN_START + SUCK_IN_TOTAL_STAGGER + LETTER_SUCK_DURATION
 // Full text split into individual letters for animation
 const FULL_TEXT = "Still drawing symbols by hand?";
 const LETTERS = FULL_TEXT.split("");
+const CENTER_INDEX = (LETTERS.length - 1) / 2; // ~14.5 (between 'm' and 'b' in "symbols")
 
 // Map each letter index to its wordlet index (for entrance animation)
 // Wordlets: "Still", " draw", "ing", " sym", "bols", " by", " ha", "nd", "?"
@@ -45,28 +46,73 @@ const getWordletIndex = (letterIndex: number): number => {
   return 0;
 };
 
-// Calculate center index and distance from center for each letter
-const CENTER_INDEX = (LETTERS.length - 1) / 2; // ~14.5
+// Attraction points (relative to text center):
+// - Green dot (top-center): where left-half letters get sucked to
+// - Pink dot (bottom-center): where right-half letters get sucked to
+// These are approximately at the tips of the extending vertical lines
+const ATTRACTION_LEFT_X = -20; // Slightly left of center (green dot X)
+const ATTRACTION_LEFT_Y = -80; // Top (green dot Y)
+const ATTRACTION_RIGHT_X = 20; // Slightly right of center (pink dot X)
+const ATTRACTION_RIGHT_Y = 80; // Bottom (pink dot Y)
 
-// Sort letter indices by distance from center (closest first)
-const LETTERS_BY_CENTER_DISTANCE = [...Array(LETTERS.length).keys()].sort(
-  (a, b) => Math.abs(a - CENTER_INDEX) - Math.abs(b - CENTER_INDEX)
+// Calculate each letter's distance from its attraction point
+// Left half (indices 0-14) attracted to green dot (top)
+// Right half (indices 15-29) attracted to pink dot (bottom)
+const getLetterDistanceFromAttraction = (letterIndex: number): number => {
+  const isLeftHalf = letterIndex < CENTER_INDEX;
+  // Approximate X position of letter relative to center (each letter ~20px wide)
+  const letterX = (letterIndex - CENTER_INDEX) * 18;
+  const letterY = 0; // Letters are on the horizontal center line
+
+  if (isLeftHalf) {
+    // Distance to green dot (top-center)
+    const dx = letterX - ATTRACTION_LEFT_X;
+    const dy = letterY - ATTRACTION_LEFT_Y;
+    return Math.sqrt(dx * dx + dy * dy);
+  } else {
+    // Distance to pink dot (bottom-center)
+    const dx = letterX - ATTRACTION_RIGHT_X;
+    const dy = letterY - ATTRACTION_RIGHT_Y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+};
+
+// Sort letters within each half by distance from their attraction point
+const LEFT_LETTERS = [...Array(Math.floor(CENTER_INDEX)).keys()];
+const RIGHT_LETTERS = [...Array(LETTERS.length - Math.ceil(CENTER_INDEX)).keys()]
+  .map(i => i + Math.ceil(CENTER_INDEX));
+
+// Sort each half: closest to attraction point first
+LEFT_LETTERS.sort((a, b) =>
+  getLetterDistanceFromAttraction(a) - getLetterDistanceFromAttraction(b)
+);
+RIGHT_LETTERS.sort((a, b) =>
+  getLetterDistanceFromAttraction(a) - getLetterDistanceFromAttraction(b)
 );
 
-// Map letter index to its suck-in order (0 = first to be sucked, closest to center)
+// Interleave left and right letters for combined order
+const SUCK_ORDER_LIST: number[] = [];
+const maxLen = Math.max(LEFT_LETTERS.length, RIGHT_LETTERS.length);
+for (let i = 0; i < maxLen; i++) {
+  if (i < LEFT_LETTERS.length) SUCK_ORDER_LIST.push(LEFT_LETTERS[i]);
+  if (i < RIGHT_LETTERS.length) SUCK_ORDER_LIST.push(RIGHT_LETTERS[i]);
+}
+
+// Map letter index to its suck-in order
 const SUCK_ORDER: Record<number, number> = {};
-LETTERS_BY_CENTER_DISTANCE.forEach((letterIdx, order) => {
+SUCK_ORDER_LIST.forEach((letterIdx, order) => {
   SUCK_ORDER[letterIdx] = order;
 });
 
-// Calculate accelerating stagger delay for each letter
-// Uses quadratic curve so gaps decrease (speeds up)
+// Calculate stagger delay - letters closer to attraction start first
+// Uses accelerating curve so pickup rate increases
 const getSuckInDelay = (letterIndex: number): number => {
   const order = SUCK_ORDER[letterIndex];
   const totalLetters = LETTERS.length;
-  // Quadratic: earlier letters (center) have bigger gaps, later ones bunch up
   const normalizedOrder = order / (totalLetters - 1); // 0 to 1
-  return SUCK_IN_TOTAL_STAGGER * Math.pow(normalizedOrder, 0.6); // Accelerating
+  // Accelerating: early letters have bigger gaps, later ones bunch up fast
+  const staggerTime = SUCK_IN_TOTAL_DURATION - LETTER_SUCK_DURATION;
+  return staggerTime * Math.pow(normalizedOrder, 0.5);
 };
 
 // =============================================================================
@@ -217,22 +263,17 @@ const getLetterSuckInAnimation = (
   // Ease-in: slow start, fast end (gravity effect)
   const easedProgress = Easing.in(Easing.quad)(progress);
 
-  // Calculate target based on letter position
-  // Left half letters go UP into top-left line
-  // Right half letters go DOWN into bottom-right line
-  const isLeftSide = letterIndex < CENTER_INDEX;
+  // Calculate letter's current X position relative to center
+  const letterX = (letterIndex - CENTER_INDEX) * 18;
 
-  // Target Y: left side goes up (-), right side goes down (+)
-  // Closer to Y=0 (horizontal center line) as requested
-  const targetY = isLeftSide ? -40 : 40;
+  // Determine which attraction point this letter goes to
+  const isLeftHalf = letterIndex < CENTER_INDEX;
 
-  // Target X: letters move toward their respective vertical line
-  // Distance from center determines how far they travel horizontally
-  const distanceFromCenter = letterIndex - CENTER_INDEX;
-  // Normalize: center letters move less, edge letters move more toward the line
-  const targetX = isLeftSide
-    ? -80 - distanceFromCenter * 3 // Left side moves left (toward left line)
-    : 80 - distanceFromCenter * 3; // Right side moves right (toward right line)
+  // Target is the attraction point (green dot for left, pink dot for right)
+  const targetX = isLeftHalf
+    ? ATTRACTION_LEFT_X - letterX // Move to green dot X
+    : ATTRACTION_RIGHT_X - letterX; // Move to pink dot X
+  const targetY = isLeftHalf ? ATTRACTION_LEFT_Y : ATTRACTION_RIGHT_Y;
 
   return {
     xOffset: targetX * easedProgress,
