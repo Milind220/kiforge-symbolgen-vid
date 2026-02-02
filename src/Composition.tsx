@@ -71,10 +71,11 @@ const TYPOGRAPHY = {
 } as const;
 
 // Symbol frame dimensions (centered around text)
+// Sized to be exactly 4×4 grid increments (240px at 60px spacing)
 const SYMBOL_FRAME = {
   width: 240,
-  height: 200, // Reduced to sit closer to the text
-  verticalArmLength: 50, // Length of vertical line segments
+  height: 240, // Square to align with grid (4 increments)
+  verticalArmLength: 60, // Length of vertical line segments (1 grid increment)
   strokeWidth: 5,
 } as const;
 
@@ -171,12 +172,12 @@ const getLineExtensionProgress = (frame: number): number => {
 // GRID CONSTANTS
 // =============================================================================
 const GRID = {
-  spacing: 80, // Distance between parallel lines
+  spacing: 60, // Distance between parallel lines (symbol frame = 4×4 increments)
   strokeWidth: 1.5,
   // Exclusion zone: coordinate dimensions + strokeWidth (visual bounds) + ~100px breathing room
   // The strokeWidth extends beyond the coordinate positions, so we account for that
   exclusionWidth: SYMBOL_FRAME.width + SYMBOL_FRAME.strokeWidth + 105, // 240 + 5 + 105 = 350
-  exclusionHeight: SYMBOL_FRAME.height + SYMBOL_FRAME.strokeWidth + 85, // 200 + 5 + 85 = 290
+  exclusionHeight: SYMBOL_FRAME.height + SYMBOL_FRAME.strokeWidth + 105, // 240 + 5 + 105 = 350 (now square)
 } as const;
 
 // =============================================================================
