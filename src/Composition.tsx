@@ -24,42 +24,50 @@ const SYMBOL_FRAME_DONE =
 // Text suck-in / line extension animation timing
 const SUCK_IN_DELAY = 2; // Frames to wait after symbol frame is complete
 const SUCK_IN_START = SYMBOL_FRAME_DONE + SUCK_IN_DELAY; // When lines start extending & text starts moving
-const SUCK_IN_DURATION = 12; // Frames for the suck-in animation
-const SUCK_IN_END = SUCK_IN_START + SUCK_IN_DURATION;
+const LETTER_SUCK_DURATION = 8; // Frames for each letter's suck-in animation
+const SUCK_IN_TOTAL_STAGGER = 15; // Total frames to stagger all letters (accelerating)
+const SUCK_IN_END = SUCK_IN_START + SUCK_IN_TOTAL_STAGGER + LETTER_SUCK_DURATION; // When last letter finishes
 
-// Suck-in target positions for each wordlet (relative to their starting position)
-// Left side wordlets get sucked into the TOP-LEFT extending line (which goes DOWN)
-// Right side wordlets get sucked into the BOTTOM-RIGHT extending line (which goes UP)
-// Format: [xOffset, yOffset] - where the wordlet ends up relative to start
-const SUCK_IN_TARGETS: Record<number, [number, number]> = {
-  // Left side → sucked UP into top-left vertical line
-  0: [120, -80],   // "Still" → right and up (toward center-top)
-  1: [80, -80],    // " draw" → right and up
-  2: [0, -100],    // "ing" → straight up into the line
-  3: [-60, -80],   // " sym" → left and up (from outside toward line)
-  // Right side → sucked DOWN into bottom-right vertical line
-  4: [60, 80],     // "bols" → right and down (toward line)
-  5: [-40, 100],   // " by" → left and down (inward)
-  6: [-80, 100],   // " ha" → left and down
-  7: [-100, 100],  // "nd" → left and down
-  8: [-120, 80],   // "?" → left and down (from outside)
+// =============================================================================
+// LETTER DATA
+// =============================================================================
+// Full text split into individual letters for animation
+const FULL_TEXT = "Still drawing symbols by hand?";
+const LETTERS = FULL_TEXT.split("");
+
+// Map each letter index to its wordlet index (for entrance animation)
+// Wordlets: "Still", " draw", "ing", " sym", "bols", " by", " ha", "nd", "?"
+const WORDLET_BOUNDARIES = [0, 5, 10, 13, 17, 21, 24, 27, 29, 30]; // Start indices
+const getWordletIndex = (letterIndex: number): number => {
+  for (let i = WORDLET_BOUNDARIES.length - 1; i >= 0; i--) {
+    if (letterIndex >= WORDLET_BOUNDARIES[i]) return i;
+  }
+  return 0;
 };
 
-// =============================================================================
-// WORDLET DATA
-// =============================================================================
-// Each wordlet is an individual animation unit
-const WORDLETS = [
-  "Still",
-  " draw",
-  "ing",
-  " sym",
-  "bols",
-  " by",
-  " ha",
-  "nd",
-  "?",
-] as const;
+// Calculate center index and distance from center for each letter
+const CENTER_INDEX = (LETTERS.length - 1) / 2; // ~14.5
+
+// Sort letter indices by distance from center (closest first)
+const LETTERS_BY_CENTER_DISTANCE = [...Array(LETTERS.length).keys()].sort(
+  (a, b) => Math.abs(a - CENTER_INDEX) - Math.abs(b - CENTER_INDEX)
+);
+
+// Map letter index to its suck-in order (0 = first to be sucked, closest to center)
+const SUCK_ORDER: Record<number, number> = {};
+LETTERS_BY_CENTER_DISTANCE.forEach((letterIdx, order) => {
+  SUCK_ORDER[letterIdx] = order;
+});
+
+// Calculate accelerating stagger delay for each letter
+// Uses quadratic curve so gaps decrease (speeds up)
+const getSuckInDelay = (letterIndex: number): number => {
+  const order = SUCK_ORDER[letterIndex];
+  const totalLetters = LETTERS.length;
+  // Quadratic: earlier letters (center) have bigger gaps, later ones bunch up
+  const normalizedOrder = order / (totalLetters - 1); // 0 to 1
+  return SUCK_IN_TOTAL_STAGGER * Math.pow(normalizedOrder, 0.6); // Accelerating
+};
 
 // =============================================================================
 // STYLE CONSTANTS
@@ -91,30 +99,30 @@ const SYMBOL_FRAME = {
 // =============================================================================
 
 // Get the frame when a wordlet first appears
-const getWordletAppearFrame = (index: number): number =>
-  FIRST_WORD_APPEAR + index * WORD_STAGGER;
+const getWordletAppearFrame = (wordletIndex: number): number =>
+  FIRST_WORD_APPEAR + wordletIndex * WORD_STAGGER;
 
-// Get wordlet's current Y offset and opacity based on frame
-const getWordletAnimation = (
+// Get letter's entrance animation (based on its wordlet)
+const getLetterEntranceAnimation = (
   frame: number,
-  index: number
+  letterIndex: number
 ): { yOffset: number; opacity: number } => {
-  const appearFrame = getWordletAppearFrame(index);
+  const wordletIndex = getWordletIndex(letterIndex);
+  const appearFrame = getWordletAppearFrame(wordletIndex);
 
-  // Word hasn't appeared yet
+  // Letter hasn't appeared yet
   if (frame < appearFrame) {
     return { yOffset: WORD_START_OFFSET, opacity: 0 };
   }
 
   const framesSinceAppear = frame - appearFrame;
 
-  // Word is fully in position
+  // Letter is fully in position
   if (framesSinceAppear >= EASE_DURATION) {
     return { yOffset: 0, opacity: 1 };
   }
 
   // Easing in: strong ease-out curve (fast start, tiny movement at end)
-  // Using cubic for pronounced deceleration in final frames
   const progress = interpolate(
     framesSinceAppear,
     [0, EASE_DURATION],
@@ -180,38 +188,57 @@ const getLineExtensionProgress = (frame: number): number => {
   return Easing.inOut(Easing.cubic)(progress);
 };
 
-// Get text suck-in animation
-const getTextSuckInAnimation = (
+// Get letter suck-in animation
+const getLetterSuckInAnimation = (
   frame: number,
-  wordletIndex: number
+  letterIndex: number
 ): { xOffset: number; yOffset: number; opacity: number; scale: number } => {
-  // Before suck-in starts, no offset
-  if (frame < SUCK_IN_START) {
+  // Get this letter's staggered start time
+  const letterDelay = getSuckInDelay(letterIndex);
+  const letterStart = SUCK_IN_START + letterDelay;
+  const letterEnd = letterStart + LETTER_SUCK_DURATION;
+
+  // Before this letter's suck-in starts
+  if (frame < letterStart) {
     return { xOffset: 0, yOffset: 0, opacity: 1, scale: 1 };
   }
 
-  // After suck-in ends, text is gone
-  if (frame >= SUCK_IN_END) {
+  // After this letter's suck-in ends
+  if (frame >= letterEnd) {
     return { xOffset: 0, yOffset: 0, opacity: 0, scale: 0 };
   }
 
   const progress = interpolate(
     frame,
-    [SUCK_IN_START, SUCK_IN_END],
+    [letterStart, letterEnd],
     [0, 1],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
   // Ease-in: slow start, fast end (gravity effect)
   const easedProgress = Easing.in(Easing.quad)(progress);
 
-  // Get target position for this wordlet
-  const [targetX, targetY] = SUCK_IN_TARGETS[wordletIndex] ?? [0, 0];
+  // Calculate target based on letter position
+  // Left half letters go UP into top-left line
+  // Right half letters go DOWN into bottom-right line
+  const isLeftSide = letterIndex < CENTER_INDEX;
+
+  // Target Y: left side goes up (-), right side goes down (+)
+  // Closer to Y=0 (horizontal center line) as requested
+  const targetY = isLeftSide ? -40 : 40;
+
+  // Target X: letters move toward their respective vertical line
+  // Distance from center determines how far they travel horizontally
+  const distanceFromCenter = letterIndex - CENTER_INDEX;
+  // Normalize: center letters move less, edge letters move more toward the line
+  const targetX = isLeftSide
+    ? -80 - distanceFromCenter * 3 // Left side moves left (toward left line)
+    : 80 - distanceFromCenter * 3; // Right side moves right (toward right line)
 
   return {
     xOffset: targetX * easedProgress,
     yOffset: targetY * easedProgress,
     opacity: 1 - easedProgress,
-    scale: 1 - easedProgress * 0.6,
+    scale: 1 - easedProgress * 0.5,
   };
 };
 
@@ -306,16 +333,6 @@ export const MyComposition: React.FC = () => {
   // Text visibility (hidden after suck-in completes)
   const textVisible = frame < SUCK_IN_END;
 
-  // Get animation state for each wordlet
-  const wordletAnimations = WORDLETS.map((_, index) =>
-    getWordletAnimation(frame, index)
-  );
-
-  // Get suck-in animation for each wordlet
-  const suckInAnimations = WORDLETS.map((_, index) =>
-    getTextSuckInAnimation(frame, index)
-  );
-
   return (
     <AbsoluteFill
       style={{
@@ -327,7 +344,7 @@ export const MyComposition: React.FC = () => {
       {/* Symbol frame (behind text) */}
       <SymbolFrame frame={frame} />
 
-      {/* Text - gets sucked into the extending lines */}
+      {/* Text - each letter animates independently */}
       {textVisible && (
         <div
           style={{
@@ -336,9 +353,9 @@ export const MyComposition: React.FC = () => {
             color: COLORS.text,
           }}
         >
-          {WORDLETS.map((wordlet, index) => {
-            const enterAnim = wordletAnimations[index];
-            const suckIn = suckInAnimations[index];
+          {LETTERS.map((letter, index) => {
+            const enterAnim = getLetterEntranceAnimation(frame, index);
+            const suckIn = getLetterSuckInAnimation(frame, index);
 
             // Combine Y offsets: enter animation + suck-in animation
             const totalYOffset = enterAnim.yOffset + suckIn.yOffset;
@@ -353,7 +370,7 @@ export const MyComposition: React.FC = () => {
                   whiteSpace: "pre",
                 }}
               >
-                {wordlet}
+                {letter}
               </span>
             );
           })}
