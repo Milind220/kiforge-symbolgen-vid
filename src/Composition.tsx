@@ -21,11 +21,13 @@ const SYMBOL_LINE_STAGGER = 1; // Frames between each line element
 const SYMBOL_FRAME_DONE =
   SYMBOL_FRAME_START + 5 * SYMBOL_LINE_STAGGER + SYMBOL_FRAME_EASE_DURATION; // All 6 lines in place
 
-// Text suck-in / line extension animation timing
-const SUCK_IN_DELAY = 2; // Frames to wait after symbol frame is complete
-const SUCK_IN_START = SYMBOL_FRAME_DONE + SUCK_IN_DELAY; // When lines start extending & text starts moving
-const SUCK_IN_TOTAL_DURATION = 10; // Frames for furthest letter to reach line
-const SUCK_IN_END = SUCK_IN_START + SUCK_IN_TOTAL_DURATION;
+// line extension animation timing
+const LINE_EXTENSION_DELAY = 2; // Frames to wait after symbol frame is complete
+const OPENING_TEXT_DISAPPEAR_DELAY = 4; // Frames to wait after line extension starts
+const LINE_EXTENSION_START = SYMBOL_FRAME_DONE + LINE_EXTENSION_DELAY; // When lines start extending & text starts moving
+const OPENING_TEXT_DISAPPEAR_START = LINE_EXTENSION_START + OPENING_TEXT_DISAPPEAR_DELAY; // When opening text starts disappearing
+const LINE_EXTENSION_TOTAL_DURATION = 10; // Frames for furthest letter to reach line
+const LINE_EXTENSION_END = LINE_EXTENSION_START + LINE_EXTENSION_TOTAL_DURATION;
 
 // =============================================================================
 // LETTER DATA
@@ -147,10 +149,10 @@ const getSymbolLineAnimation = (
 
 // Get line extension progress (0 = arm length, 1 = full height)
 const getLineExtensionProgress = (frame: number): number => {
-  if (frame < SUCK_IN_START) return 0;
-  if (frame >= SUCK_IN_END) return 1;
+  if (frame < LINE_EXTENSION_START) return 0;
+  if (frame >= LINE_EXTENSION_END) return 1;
 
-  const progress = interpolate(frame, [SUCK_IN_START, SUCK_IN_END], [0, 1], {
+  const progress = interpolate(frame, [LINE_EXTENSION_START, LINE_EXTENSION_END], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -247,7 +249,7 @@ export const MyComposition: React.FC = () => {
   const frame = useCurrentFrame();
 
   // Text visibility (hidden instantly when line extension starts)
-  const textVisible = frame < SUCK_IN_START;
+  const textVisible = frame < OPENING_TEXT_DISAPPEAR_START;
 
   return (
     <AbsoluteFill
