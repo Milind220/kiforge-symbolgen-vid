@@ -33,7 +33,6 @@ const SUCK_IN_END = SUCK_IN_START + SUCK_IN_TOTAL_DURATION;
 // Full text split into individual letters for animation
 const FULL_TEXT = "Still drawing symbols by hand?";
 const LETTERS = FULL_TEXT.split("");
-const CENTER_INDEX = (LETTERS.length - 1) / 2; // ~14.5 (between 'm' and 'b' in "symbols")
 
 // Map each letter index to its wordlet index (for entrance animation)
 // Wordlets: "Still", " draw", "ing", " sym", "bols", " by", " ha", "nd", "?"
@@ -71,37 +70,6 @@ const SYMBOL_FRAME = {
 } as const;
 
 // =============================================================================
-// LETTER SUCK-IN CALCULATIONS
-// =============================================================================
-// Letter spacing (approximate width per character at this font size)
-const LETTER_WIDTH = 18;
-
-// Calculate letter's X position relative to screen center
-const getLetterX = (letterIndex: number): number =>
-  (letterIndex - CENTER_INDEX) * LETTER_WIDTH;
-
-// Target X positions: the vertical lines of the symbol frame
-// Left half letters go to left line, right half go to right line
-const LEFT_LINE_X = -SYMBOL_FRAME.width / 2; // -120
-const RIGHT_LINE_X = SYMBOL_FRAME.width / 2; // 120
-
-// Calculate distance each letter must travel to reach its target line
-const getLetterDistance = (letterIndex: number): number => {
-  const letterX = getLetterX(letterIndex);
-  const isLeftHalf = letterIndex < CENTER_INDEX;
-  const targetX = isLeftHalf ? LEFT_LINE_X : RIGHT_LINE_X;
-  return Math.abs(targetX - letterX);
-};
-
-// Find the maximum distance any letter needs to travel (for speed calculation)
-const MAX_LETTER_DISTANCE = Math.max(
-  ...LETTERS.map((_, i) => getLetterDistance(i))
-);
-
-// All letters move at same speed - furthest letter takes full duration
-const SUCK_SPEED = MAX_LETTER_DISTANCE / SUCK_IN_TOTAL_DURATION;
-
-// =============================================================================
 // HELPERS
 // =============================================================================
 
@@ -112,7 +80,7 @@ const getWordletAppearFrame = (wordletIndex: number): number =>
 // Get letter's entrance animation (based on its wordlet)
 const getLetterEntranceAnimation = (
   frame: number,
-  letterIndex: number
+  letterIndex: number,
 ): { yOffset: number; opacity: number } => {
   const wordletIndex = getWordletIndex(letterIndex);
   const appearFrame = getWordletAppearFrame(wordletIndex);
@@ -130,12 +98,9 @@ const getLetterEntranceAnimation = (
   }
 
   // Easing in: strong ease-out curve (fast start, tiny movement at end)
-  const progress = interpolate(
-    framesSinceAppear,
-    [0, EASE_DURATION],
-    [0, 1],
-    { extrapolateRight: "clamp" }
-  );
+  const progress = interpolate(framesSinceAppear, [0, EASE_DURATION], [0, 1], {
+    extrapolateRight: "clamp",
+  });
   const easedProgress = Easing.out(Easing.cubic)(progress);
 
   return {
@@ -148,7 +113,7 @@ const getLetterEntranceAnimation = (
 // lineIndex: 0-2 = bottom lines (first), 3-5 = top lines (second)
 const getSymbolLineAnimation = (
   frame: number,
-  lineIndex: number
+  lineIndex: number,
 ): { yOffset: number; opacity: number } => {
   const appearFrame = SYMBOL_FRAME_START + lineIndex * SYMBOL_LINE_STAGGER;
 
@@ -169,7 +134,7 @@ const getSymbolLineAnimation = (
     framesSinceAppear,
     [0, SYMBOL_FRAME_EASE_DURATION],
     [0, 1],
-    { extrapolateRight: "clamp" }
+    { extrapolateRight: "clamp" },
   );
   // Use aggressive bezier curve for whizz effect (fast start, strong deceleration)
   const easedProgress = Easing.bezier(0.22, 1, 0.36, 1)(progress);
@@ -185,45 +150,12 @@ const getLineExtensionProgress = (frame: number): number => {
   if (frame < SUCK_IN_START) return 0;
   if (frame >= SUCK_IN_END) return 1;
 
-  const progress = interpolate(
-    frame,
-    [SUCK_IN_START, SUCK_IN_END],
-    [0, 1],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-  );
+  const progress = interpolate(frame, [SUCK_IN_START, SUCK_IN_END], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
   // Smooth ease for line drawing
   return Easing.inOut(Easing.cubic)(progress);
-};
-
-// Get letter suck-in animation
-// Letters move horizontally toward their target line and disappear on contact
-const getLetterSuckInAnimation = (
-  frame: number,
-  letterIndex: number
-): { xOffset: number; opacity: number } => {
-  // Before suck-in starts
-  if (frame < SUCK_IN_START) {
-    return { xOffset: 0, opacity: 1 };
-  }
-
-  const isLeftHalf = letterIndex < CENTER_INDEX;
-  const distance = getLetterDistance(letterIndex);
-
-  // Calculate how far this letter has moved
-  const framesSinceStart = frame - SUCK_IN_START;
-  const distanceTraveled = framesSinceStart * SUCK_SPEED;
-
-  // Letter has reached the line - disappear instantly
-  if (distanceTraveled >= distance) {
-    return { xOffset: 0, opacity: 0 };
-  }
-
-  // Calculate X offset (direction depends on which half)
-  // Left half moves left (negative), right half moves right (positive)
-  const direction = isLeftHalf ? -1 : 1;
-  const xOffset = direction * distanceTraveled;
-
-  return { xOffset, opacity: 1 };
 };
 
 // =============================================================================
@@ -239,7 +171,7 @@ const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
 
   // Get animation for each of the 6 lines
   const lineAnims = Array.from({ length: 6 }, (_, i) =>
-    getSymbolLineAnimation(frame, i)
+    getSymbolLineAnimation(frame, i),
   );
 
   // Get line extension progress
@@ -339,15 +271,14 @@ export const MyComposition: React.FC = () => {
         >
           {LETTERS.map((letter, index) => {
             const enterAnim = getLetterEntranceAnimation(frame, index);
-            const suckIn = getLetterSuckInAnimation(frame, index);
 
             return (
               <span
                 key={index}
                 style={{
                   display: "inline-block",
-                  transform: `translate(${suckIn.xOffset}px, ${enterAnim.yOffset}px)`,
-                  opacity: enterAnim.opacity * suckIn.opacity,
+                  transform: `translateY(${enterAnim.yOffset}px)`,
+                  opacity: enterAnim.opacity,
                   whiteSpace: "pre",
                 }}
               >
