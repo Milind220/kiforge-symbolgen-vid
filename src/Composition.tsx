@@ -22,7 +22,8 @@ const SYMBOL_FRAME_DONE =
   SYMBOL_FRAME_START + 5 * SYMBOL_LINE_STAGGER + SYMBOL_FRAME_EASE_DURATION; // All 6 lines in place
 
 // Text disappear timing
-const TEXT_DISAPPEAR_FRAME = SYMBOL_FRAME_DONE; // Text pops out when symbol frame is complete
+const TEXT_DISAPPEAR_DELAY = 2; // Frames to wait after symbol frame is complete
+const TEXT_DISAPPEAR_FRAME = SYMBOL_FRAME_DONE + TEXT_DISAPPEAR_DELAY; // Text pops out when symbol frame is complete
 
 // =============================================================================
 // WORDLET DATA
