@@ -18,6 +18,11 @@ const SYMBOL_FRAME_START = WORDLETS_DONE_FRAME + SYMBOL_FRAME_DELAY;
 const SYMBOL_FRAME_EASE_DURATION = 5; // 5 frames to whizz into position
 const SYMBOL_FRAME_START_OFFSET = 400; // Start far outside frame (whizz in effect)
 const SYMBOL_LINE_STAGGER = 1; // Frames between each line element
+const SYMBOL_FRAME_DONE =
+  SYMBOL_FRAME_START + 5 * SYMBOL_LINE_STAGGER + SYMBOL_FRAME_EASE_DURATION; // All 6 lines in place
+
+// Text disappear timing
+const TEXT_DISAPPEAR_FRAME = SYMBOL_FRAME_DONE; // Text pops out when symbol frame is complete
 
 // =============================================================================
 // WORDLET DATA
@@ -217,6 +222,9 @@ const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
 export const MyComposition: React.FC = () => {
   const frame = useCurrentFrame();
 
+  // Text visibility (pops out instantly)
+  const textVisible = frame < TEXT_DISAPPEAR_FRAME;
+
   // Get animation state for each wordlet
   const wordletAnimations = WORDLETS.map((_, index) =>
     getWordletAnimation(frame, index)
@@ -233,32 +241,34 @@ export const MyComposition: React.FC = () => {
       {/* Symbol frame (behind text) */}
       <SymbolFrame frame={frame} />
 
-      {/* Text */}
-      <div
-        style={{
-          fontSize: TYPOGRAPHY.fontSize,
-          fontFamily: FONTS.sans,
-          color: COLORS.text,
-        }}
-      >
-        {WORDLETS.map((wordlet, index) => {
-          const anim = wordletAnimations[index];
+      {/* Text - disappears instantly at TEXT_DISAPPEAR_FRAME */}
+      {textVisible && (
+        <div
+          style={{
+            fontSize: TYPOGRAPHY.fontSize,
+            fontFamily: FONTS.sans,
+            color: COLORS.text,
+          }}
+        >
+          {WORDLETS.map((wordlet, index) => {
+            const anim = wordletAnimations[index];
 
-          return (
-            <span
-              key={index}
-              style={{
-                display: "inline-block",
-                transform: `translateY(${anim.yOffset}px)`,
-                opacity: anim.opacity,
-                whiteSpace: "pre",
-              }}
-            >
-              {wordlet}
-            </span>
-          );
-        })}
-      </div>
+            return (
+              <span
+                key={index}
+                style={{
+                  display: "inline-block",
+                  transform: `translateY(${anim.yOffset}px)`,
+                  opacity: anim.opacity,
+                  whiteSpace: "pre",
+                }}
+              >
+                {wordlet}
+              </span>
+            );
+          })}
+        </div>
+      )}
     </AbsoluteFill>
   );
 };
