@@ -55,10 +55,10 @@ const FILL_COLOR_TRANSITION_START =
 const STROKE_COLOR_TRANSITION_DELAY = 1; // Frames after fill color transition starts
 const STROKE_COLOR_TRANSITION_START =
   FILL_COLOR_TRANSITION_START + STROKE_COLOR_TRANSITION_DELAY; // Frame 66
-const COLOR_TRANSITION_DURATION = 18; // Duration of color spring animations
 
-// Symbol pins timing (swing out after color transitions complete)
-const PINS_SWING_START = FILL_COLOR_TRANSITION_START + COLOR_TRANSITION_DURATION; // Frame 83
+// Symbol pins timing (triggered when frame "smacks" into place during growth spring)
+const PINS_SWING_DELAY = 6; // Frames after frame growth starts (when spring first hits target)
+const PINS_SWING_START = FRAME_GROW_START + PINS_SWING_DELAY; // Frame 68
 const PINS_SWING_STAGGER = 2; // Frames between each pin starting to swing
 
 // =============================================================================
@@ -612,7 +612,8 @@ const SymbolPins: React.FC<{
         // Calculate rotation: starts at 90° (flush/hidden), ends at 0° (horizontal)
         // Left pins rotate from +90° to 0° (swing counterclockwise)
         // Right pins rotate from -90° to 0° (swing clockwise)
-        const startAngle = side === "left" ? 90 : -90;
+        // Swing upward: pins start pointing down, swing up to horizontal
+        const startAngle = side === "left" ? -90 : 90;
         const rotation = interpolate(swingProgress, [0, 1], [startAngle, 0]);
 
         // Pin connection point (pivot) is at the frame edge
