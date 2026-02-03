@@ -61,19 +61,39 @@ const PINS_SWING_DELAY = 6; // Frames after frame growth starts (when spring fir
 const PINS_SWING_START = FRAME_GROW_START + PINS_SWING_DELAY; // Frame 68
 const PINS_SWING_STAGGER = 2; // Frames between each pin starting to swing
 
+// Second text timing ("What if there was a better way?")
+const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
+const SECOND_TEXT_START = PINS_SWING_START + SECOND_TEXT_DELAY; // Frame 70
+const SECOND_TEXT_STAGGER = 3; // Frames between each wordlet (same as opening text)
+const SECOND_TEXT_EASE_DURATION = 5; // Frames to ease into position
+
 // =============================================================================
 // LETTER DATA
 // =============================================================================
-// Full text split into individual letters for animation
-const FULL_TEXT = "Still drawing symbols by hand?";
-const LETTERS = FULL_TEXT.split("");
+// Opening text split into individual letters for animation
+const OPENING_TEXT = "Still drawing symbols by hand?";
+const OPENING_LETTERS = OPENING_TEXT.split("");
 
 // Map each letter index to its wordlet index (for entrance animation)
 // Wordlets: "Still", " draw", "ing", " sym", "bols", " by", " ha", "nd", "?"
-const WORDLET_BOUNDARIES = [0, 5, 10, 13, 17, 21, 24, 27, 29, 30]; // Start indices
-const getWordletIndex = (letterIndex: number): number => {
-  for (let i = WORDLET_BOUNDARIES.length - 1; i >= 0; i--) {
-    if (letterIndex >= WORDLET_BOUNDARIES[i]) return i;
+const OPENING_WORDLET_BOUNDARIES = [0, 5, 10, 13, 17, 21, 24, 27, 29, 30]; // Start indices
+const getOpeningWordletIndex = (letterIndex: number): number => {
+  for (let i = OPENING_WORDLET_BOUNDARIES.length - 1; i >= 0; i--) {
+    if (letterIndex >= OPENING_WORDLET_BOUNDARIES[i]) return i;
+  }
+  return 0;
+};
+
+// Second text split into individual letters for animation
+const SECOND_TEXT = "What if there was a better way?";
+const SECOND_LETTERS = SECOND_TEXT.split("");
+
+// Map each letter index to its wordlet index
+// Wordlets: "What", " if", " there", " was", " a", " bet", "ter", " way", "?"
+const SECOND_WORDLET_BOUNDARIES = [0, 4, 7, 13, 17, 19, 23, 26, 30, 31]; // Start indices
+const getSecondWordletIndex = (letterIndex: number): number => {
+  for (let i = SECOND_WORDLET_BOUNDARIES.length - 1; i >= 0; i--) {
+    if (letterIndex >= SECOND_WORDLET_BOUNDARIES[i]) return i;
   }
   return 0;
 };
@@ -110,17 +130,17 @@ const SYMBOL_FRAME_STROKE = {
 // HELPERS
 // =============================================================================
 
-// Get the frame when a wordlet first appears
-const getWordletAppearFrame = (wordletIndex: number): number =>
+// Get the frame when an opening text wordlet first appears
+const getOpeningWordletAppearFrame = (wordletIndex: number): number =>
   FIRST_WORD_APPEAR + wordletIndex * WORD_STAGGER;
 
-// Get letter's entrance animation (based on its wordlet)
-const getLetterEntranceAnimation = (
+// Get opening text letter's entrance animation (based on its wordlet)
+const getOpeningLetterAnimation = (
   frame: number,
   letterIndex: number,
 ): { yOffset: number; opacity: number } => {
-  const wordletIndex = getWordletIndex(letterIndex);
-  const appearFrame = getWordletAppearFrame(wordletIndex);
+  const wordletIndex = getOpeningWordletIndex(letterIndex);
+  const appearFrame = getOpeningWordletAppearFrame(wordletIndex);
 
   // Letter hasn't appeared yet
   if (frame < appearFrame) {
@@ -138,6 +158,45 @@ const getLetterEntranceAnimation = (
   const progress = interpolate(framesSinceAppear, [0, EASE_DURATION], [0, 1], {
     extrapolateRight: "clamp",
   });
+  const easedProgress = Easing.out(Easing.cubic)(progress);
+
+  return {
+    yOffset: WORD_START_OFFSET * (1 - easedProgress),
+    opacity: 1,
+  };
+};
+
+// Get the frame when a second text wordlet first appears
+const getSecondWordletAppearFrame = (wordletIndex: number): number =>
+  SECOND_TEXT_START + wordletIndex * SECOND_TEXT_STAGGER;
+
+// Get second text letter's entrance animation (based on its wordlet)
+const getSecondLetterAnimation = (
+  frame: number,
+  letterIndex: number,
+): { yOffset: number; opacity: number } => {
+  const wordletIndex = getSecondWordletIndex(letterIndex);
+  const appearFrame = getSecondWordletAppearFrame(wordletIndex);
+
+  // Letter hasn't appeared yet
+  if (frame < appearFrame) {
+    return { yOffset: WORD_START_OFFSET, opacity: 0 };
+  }
+
+  const framesSinceAppear = frame - appearFrame;
+
+  // Letter is fully in position
+  if (framesSinceAppear >= SECOND_TEXT_EASE_DURATION) {
+    return { yOffset: 0, opacity: 1 };
+  }
+
+  // Easing in: strong ease-out curve (fast start, tiny movement at end)
+  const progress = interpolate(
+    framesSinceAppear,
+    [0, SECOND_TEXT_EASE_DURATION],
+    [0, 1],
+    { extrapolateRight: "clamp" },
+  );
   const easedProgress = Easing.out(Easing.cubic)(progress);
 
   return {
@@ -779,7 +838,7 @@ export const MyComposition: React.FC = () => {
         frameHeight={frameHeight}
       />
 
-      {/* Text - each letter animates independently */}
+      {/* Opening text - each letter animates independently */}
       {textVisible && (
         <div
           style={{
@@ -788,8 +847,43 @@ export const MyComposition: React.FC = () => {
             color: COLORS.darkText,
           }}
         >
-          {LETTERS.map((letter, index) => {
-            const enterAnim = getLetterEntranceAnimation(frame, index);
+          {OPENING_LETTERS.map((letter, index) => {
+            const enterAnim = getOpeningLetterAnimation(frame, index);
+
+            return (
+              <span
+                key={index}
+                style={{
+                  display: "inline-block",
+                  transform: `translateY(${enterAnim.yOffset}px)`,
+                  opacity: enterAnim.opacity,
+                  whiteSpace: "pre",
+                }}
+              >
+                {letter}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Second text - centered above symbol frame */}
+      {frame >= SECOND_TEXT_START && (
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: `translate(-50%, calc(-50% - ${frameHeight / 2 + 90}px))`,
+            fontSize: TYPOGRAPHY.fontSize * 0.9,
+            fontFamily: FONTS.sans,
+            color: COLORS.darkText,
+            whiteSpace: "nowrap",
+            textAlign: "center",
+          }}
+        >
+          {SECOND_LETTERS.map((letter, index) => {
+            const enterAnim = getSecondLetterAnimation(frame, index);
 
             return (
               <span
