@@ -94,6 +94,11 @@ const SYMBOL_FRAME = {
   verticalArmLength: 60, // Length of vertical line segments (1.5 grid increments)
   strokeWidth: 5,
 } as const;
+const SYMBOL_FRAME_STROKE = {
+  linecap: "square" as const,
+  linejoin: "miter" as const,
+  shapeRendering: "geometricPrecision" as const,
+} as const;
 
 // =============================================================================
 // HELPERS
@@ -415,15 +420,13 @@ const SymbolFrame: React.FC<{
 
   // Get line extension progress
   const extensionProgress = getLineExtensionProgress(frame);
+  const useSegmentLines = frame < SYMBOL_FRAME_DONE;
 
   // Calculate positions
   const left = -width / 2;
   const right = width / 2;
   const top = -height / 2;
   const bottom = height / 2;
-
-  // Extend horizontal lines by half stroke width for clean 90° corners
-  const cornerOverlap = strokeWidth / 2;
 
   // Calculate how far the extending lines should go
   // Gap between top arm end and bottom arm start
@@ -435,13 +438,25 @@ const SymbolFrame: React.FC<{
   const lines: [number, number, number, number, number][] = [
     // Bottom group (animate first)
     [left, bottom - verticalArmLength, left, bottom, 0], // Bottom left vertical (static)
-    [left - cornerOverlap, bottom, right + cornerOverlap, bottom, 1], // Bottom horizontal
+    [left, bottom, right, bottom, 1], // Bottom horizontal
     [right, bottom - verticalArmLength - extensionAmount, right, bottom, 2], // Bottom right vertical (extends UP)
     // Top group (animate second)
     [left, top, left, top + verticalArmLength + extensionAmount, 3], // Top left vertical (extends DOWN)
-    [left - cornerOverlap, top, right + cornerOverlap, top, 4], // Top horizontal
+    [left, top, right, top, 4], // Top horizontal
     [right, top, right, top + verticalArmLength, 5], // Top right vertical (static)
   ];
+  const bottomPath = [
+    `M ${left} ${bottom - verticalArmLength}`,
+    `L ${left} ${bottom}`,
+    `L ${right} ${bottom}`,
+    `L ${right} ${bottom - verticalArmLength - extensionAmount}`,
+  ].join(" ");
+  const topPath = [
+    `M ${left} ${top + verticalArmLength + extensionAmount}`,
+    `L ${left} ${top}`,
+    `L ${right} ${top}`,
+    `L ${right} ${top + verticalArmLength}`,
+  ].join(" ");
 
   // Fill rectangle dimensions (inset by half stroke width to sit inside the frame)
   const fillInset = strokeWidth / 2;
@@ -461,6 +476,7 @@ const SymbolFrame: React.FC<{
         top: "50%",
         transform: "translate(-50%, -50%)",
         overflow: "visible",
+        shapeRendering: SYMBOL_FRAME_STROKE.shapeRendering,
       }}
     >
       {/* Interior fill rectangle (behind the frame lines) */}
@@ -471,24 +487,47 @@ const SymbolFrame: React.FC<{
         height={fillHeight}
         fill={fillColor}
       />
-      {lines.map(([x1, y1, x2, y2, animIndex], i) => {
-        const anim = lineAnims[animIndex];
-        return (
-          <line
-            key={i}
-            x1={x1}
-            y1={y1}
-            x2={x2}
-            y2={y2}
+      {useSegmentLines ? (
+        lines.map(([x1, y1, x2, y2, animIndex], i) => {
+          const anim = lineAnims[animIndex];
+          return (
+            <line
+              key={i}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              strokeLinecap={SYMBOL_FRAME_STROKE.linecap}
+              strokeLinejoin={SYMBOL_FRAME_STROKE.linejoin}
+              style={{
+                transform: `translateY(${anim.yOffset}px)`,
+                opacity: anim.opacity,
+              }}
+            />
+          );
+        })
+      ) : (
+        <>
+          <path
+            d={bottomPath}
+            fill="none"
             stroke={strokeColor}
             strokeWidth={strokeWidth}
-            style={{
-              transform: `translateY(${anim.yOffset}px)`,
-              opacity: anim.opacity,
-            }}
+            strokeLinecap={SYMBOL_FRAME_STROKE.linecap}
+            strokeLinejoin={SYMBOL_FRAME_STROKE.linejoin}
           />
-        );
-      })}
+          <path
+            d={topPath}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap={SYMBOL_FRAME_STROKE.linecap}
+            strokeLinejoin={SYMBOL_FRAME_STROKE.linejoin}
+          />
+        </>
+      )}
     </svg>
   );
 };
