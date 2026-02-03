@@ -636,10 +636,7 @@ const SymbolPins: React.FC<{
             stroke={strokeColor}
             strokeWidth={strokeWidth}
             strokeLinecap={SYMBOL_FRAME_STROKE.linecap}
-            style={{
-              transformOrigin: `${pivotX}px ${pivotY}px`,
-              transform: `rotate(${rotation}deg)`,
-            }}
+            transform={`rotate(${rotation} ${pivotX} ${pivotY})`}
           />
         );
       })}
