@@ -275,6 +275,61 @@ const GRID = {
   exclusionHeight: SYMBOL_FRAME.height + SYMBOL_FRAME.strokeWidth,
 } as const;
 
+// Teal highlight segments that zip outward when rotation begins
+// Each segment: { line: grid line index, length: segment length in px }
+// startOffset is auto-calculated to just touch the symbol frame edge
+const TEAL_HIGHLIGHTS = {
+  strokeWidth: 2, // Slightly thicker than grid lines for visibility
+  zipDistance: 600, // How far they travel during zip-out
+  zipDuration: 18, // Frames for the zip-out animation
+  // Per-segment config for direction 1 (30° → 90°)
+  direction1: [
+    { line: -2, length: 240 },
+    { line: -1, length: 280 },
+    { line: 1, length: 280 },
+    { line: 2, length: 240 },
+  ],
+  // Per-segment config for direction 2 (150° → 180°) - asymmetrical
+  direction2: [
+    { line: -3, length: 220 },
+    { line: -1, length: 280 },
+    { line: 1, length: 280 },
+    { line: 2, length: 260 },
+  ],
+} as const;
+
+// Calculate where a grid line exits the symbol frame (for highlight positioning)
+// Returns the x-offset along the line where it intersects the frame boundary
+const getLineFrameIntersection = (
+  lineYPos: number, // y-position of line in rotated coordinates
+  angleDeg: number, // rotation angle in degrees
+  frameHalfW: number, // half-width of symbol frame
+  frameHalfH: number, // half-height of symbol frame
+): number => {
+  const angleRad = (angleDeg * Math.PI) / 180;
+  const cosA = Math.cos(angleRad);
+  const sinA = Math.sin(angleRad);
+
+  // Find intersection with right edge (x' = frameHalfW)
+  const xRight = (frameHalfW + lineYPos * sinA) / cosA;
+  const yAtRight = xRight * sinA + lineYPos * cosA;
+  const rightValid = Math.abs(yAtRight) <= frameHalfH;
+
+  // Find intersection with top/bottom edges
+  const yEdge = lineYPos * cosA > 0 ? frameHalfH : -frameHalfH;
+  const xTopBot = (yEdge - lineYPos * cosA) / sinA;
+  const xAtTopBot = xTopBot * cosA - lineYPos * sinA;
+  const topBotValid = Math.abs(xAtTopBot) <= frameHalfW;
+
+  // Return the smaller valid positive x value (closest exit point)
+  const candidates: number[] = [];
+  if (rightValid && xRight > 0) candidates.push(xRight);
+  if (topBotValid && xTopBot > 0) candidates.push(xTopBot);
+
+  // Add small buffer (2px) so highlights don't quite touch the frame
+  return candidates.length > 0 ? Math.min(...candidates) + 2 : 150;
+};
+
 // Symbol pins configuration
 // Pins are 2 fine grid increments (80px) = 1 coarse grid increment
 const SYMBOL_PINS = {
@@ -348,6 +403,28 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
     [0, 1],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
+
+  // Calculate teal highlight zip-out animation (starts when rotation starts)
+  const {
+    strokeWidth: hlStrokeWidth,
+    zipDistance: hlZipDistance,
+    zipDuration: hlZipDuration,
+    direction1: hlDir1Config,
+    direction2: hlDir2Config,
+  } = TEAL_HIGHLIGHTS;
+
+  const hlZipProgress = interpolate(
+    frame,
+    [GRID_ROTATE_START, GRID_ROTATE_START + hlZipDuration],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+  const easedZip = Easing.out(Easing.cubic)(hlZipProgress); // Fast start, slow end
+  const hlOpacity = interpolate(hlZipProgress, [0, 0.7, 1], [1, 0.6, 0]); // Fade out as they zip
+
+  // Symbol frame dimensions for intersection calculation
+  const frameHalfW = SYMBOL_FRAME.width / 2;
+  const frameHalfH = SYMBOL_FRAME.height / 2;
 
   const GRID_LINE_ANGLE_START_1 = 30;
   const GRID_LINE_ANGLE_END_1 = 90;
@@ -478,6 +555,42 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
                 opacity={fineGridOpacity}
               />
             ))}
+          {/* Teal highlight segments (zip outward when rotation starts) */}
+          {hlOpacity > 0 &&
+            hlDir1Config.flatMap(({ line: lineIdx, length: hlLength }) => {
+              const yPos = lineIdx * coarseSpacing;
+              const baseOffset = getLineFrameIntersection(
+                yPos,
+                GRID_LINE_ANGLE_START_1,
+                frameHalfW,
+                frameHalfH,
+              );
+              const hlOffset = baseOffset + easedZip * hlZipDistance;
+              return [
+                // Positive side (extends right)
+                <line
+                  key={`hl1-pos-${lineIdx}`}
+                  x1={hlOffset}
+                  y1={yPos}
+                  x2={hlOffset + hlLength}
+                  y2={yPos}
+                  stroke={COLORS.teal}
+                  strokeWidth={hlStrokeWidth}
+                  opacity={hlOpacity}
+                />,
+                // Negative side (extends left)
+                <line
+                  key={`hl1-neg-${lineIdx}`}
+                  x1={-hlOffset}
+                  y1={yPos}
+                  x2={-hlOffset - hlLength}
+                  y2={yPos}
+                  stroke={COLORS.teal}
+                  strokeWidth={hlStrokeWidth}
+                  opacity={hlOpacity}
+                />,
+              ];
+            })}
         </g>
 
         {/* Second direction lines (150° → 180°) */}
@@ -508,6 +621,42 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
                 opacity={fineGridOpacity}
               />
             ))}
+          {/* Teal highlight segments (zip outward when rotation starts) */}
+          {hlOpacity > 0 &&
+            hlDir2Config.flatMap(({ line: lineIdx, length: hlLength }) => {
+              const yPos = lineIdx * coarseSpacing;
+              const baseOffset = getLineFrameIntersection(
+                yPos,
+                GRID_LINE_ANGLE_START_2,
+                frameHalfW,
+                frameHalfH,
+              );
+              const hlOffset = baseOffset + easedZip * hlZipDistance;
+              return [
+                // Positive side (extends right)
+                <line
+                  key={`hl2-pos-${lineIdx}`}
+                  x1={hlOffset}
+                  y1={yPos}
+                  x2={hlOffset + hlLength}
+                  y2={yPos}
+                  stroke={COLORS.teal}
+                  strokeWidth={hlStrokeWidth}
+                  opacity={hlOpacity}
+                />,
+                // Negative side (extends left)
+                <line
+                  key={`hl2-neg-${lineIdx}`}
+                  x1={-hlOffset}
+                  y1={yPos}
+                  x2={-hlOffset - hlLength}
+                  y2={yPos}
+                  stroke={COLORS.teal}
+                  strokeWidth={hlStrokeWidth}
+                  opacity={hlOpacity}
+                />,
+              ];
+            })}
         </g>
       </g>
     </svg>
