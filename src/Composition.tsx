@@ -117,6 +117,7 @@ const getSecondWordletIndex = (letterIndex: number): number => {
 
 const FONTS = {
   sans: "Geist, system-ui, sans-serif",
+  mono: "Geist Mono, monospace",
 } as const;
 
 const TYPOGRAPHY = {
@@ -347,6 +348,14 @@ const SYMBOL_PINS = {
   // 3 pins on left, 3 pins on right (symmetrical)
   left: [-80, 0, 80], // 3 pins
   right: [-80, 0, 80], // 3 pins (last one dragged in by cursor)
+} as const;
+
+// Pin number configuration
+const PIN_NUMBER = {
+  fontSize: 18, // Small text
+  offsetFromPin: 16, // How far above the pin line
+  offsetAlongPin: 0.4, // Fraction along pin from frame edge (0 = at frame, 1 = at tip)
+  appearDelay: 8, // Frames after pin starts swinging before number appears
 } as const;
 
 // =============================================================================
@@ -911,18 +920,62 @@ const SymbolPins: React.FC<{
         // Skip the last pin (index 5) - it's handled by the cursor drag animation
         if (index === 5) return null;
 
+        // Pin number animation (appears after pin swings out)
+        const numberStartFrame = pinStartFrame + PIN_NUMBER.appearDelay;
+        const numberSpring = spring({
+          fps,
+          frame: frame - numberStartFrame,
+          config: {
+            damping: 12,
+            mass: 0.5,
+            stiffness: 200,
+            overshootClamping: false,
+          },
+          durationInFrames: 15,
+        });
+        const numberScale = frame < numberStartFrame ? 0 : numberSpring;
+
+        // Calculate pin number position (along the pin, above it)
+        // Position is relative to pivot, then rotated with the pin
+        const numberAlongPin = length * PIN_NUMBER.offsetAlongPin;
+        const numberX = side === "left"
+          ? pivotX - numberAlongPin
+          : pivotX + numberAlongPin;
+        const numberY = pivotY - PIN_NUMBER.offsetFromPin;
+
+        // Pin numbers: left side = 1,2,3 (top to bottom), right side = 4,5,6 (top to bottom)
+        // But index 5 is skipped here, so right side shows 4,5 for indices 3,4
+        const pinNumber = index + 1;
+
         return (
-          <line
-            key={`${side}-${index}`}
-            x1={pivotX}
-            y1={pivotY}
-            x2={endX}
-            y2={pivotY}
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
-            strokeLinecap={SYMBOL_FRAME_STROKE.linecap}
-            transform={`rotate(${rotation} ${pivotX} ${pivotY})`}
-          />
+          <g key={`${side}-${index}`} transform={`rotate(${rotation} ${pivotX} ${pivotY})`}>
+            <line
+              x1={pivotX}
+              y1={pivotY}
+              x2={endX}
+              y2={pivotY}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              strokeLinecap={SYMBOL_FRAME_STROKE.linecap}
+            />
+            {/* Pin number */}
+            <text
+              x={numberX}
+              y={numberY}
+              fill={COLORS.silver}
+              fontFamily={FONTS.mono}
+              fontSize={PIN_NUMBER.fontSize}
+              textAnchor="middle"
+              dominantBaseline="auto"
+              style={{
+                transform: `scale(${numberScale})`,
+                transformOrigin: `${numberX}px ${numberY}px`,
+                transformBox: "fill-box",
+              }}
+            >
+              {pinNumber}
+            </text>
+          </g>
         );
       })}
     </svg>
@@ -996,6 +1049,18 @@ const MouseCursorWithPin: React.FC<{
           strokeWidth={pinStrokeWidth}
           strokeLinecap={SYMBOL_FRAME_STROKE.linecap}
         />
+        {/* Pin number 6 - moves with the dragged pin */}
+        <text
+          x={cursorX - pinLength * (1 - PIN_NUMBER.offsetAlongPin)}
+          y={cursorY - PIN_NUMBER.offsetFromPin}
+          fill={COLORS.silver}
+          fontFamily={FONTS.mono}
+          fontSize={PIN_NUMBER.fontSize}
+          textAnchor="middle"
+          dominantBaseline="auto"
+        >
+          6
+        </text>
       </svg>
 
       {/* Cursor SVG (large exaggerated arrow pointer ~80x80) */}
