@@ -42,7 +42,7 @@ const LINE_EXTENSION_END = LINE_EXTENSION_START + LINE_EXTENSION_TOTAL_DURATION;
 const GRID_APPEAR_START = SYMBOL_FRAME_DONE - 3; // Start appearing slightly before symbol frame completes
 const GRID_APPEAR_DURATION = 15; // Frames for grid to fade in
 const GRID_ROTATE_START = GRID_APPEAR_START; // Rotation starts immediately with appearance
-const GRID_ROTATE_DURATION = 25; // Frames for rotation from 45° to 0° (slightly longer to overlap with fade-in)
+const GRID_ROTATE_DURATION = 25; // Frames for grid rotation (slightly longer to overlap with fade-in)
 
 // Symbol frame vertical growth animation
 const FRAME_GROW_START = 62; // Frame when vertical growth begins
@@ -286,7 +286,8 @@ const SYMBOL_PINS = {
 // DIAGONAL GRID COMPONENT
 // =============================================================================
 
-// Creates a diagonal grid that rotates from 45° to 0° (horizontal/vertical)
+// Creates a diagonal grid where lines start at 30° and 150° (120° apart)
+// and rotate to 90° and 180° (vertical/horizontal)
 // Lines are clipped to avoid the center exclusion zone
 const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
   const { spacing, strokeWidth, exclusionWidth } = GRID;
@@ -325,7 +326,7 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
-  // Calculate rotation (45° to 0°, clockwise)
+  // Calculate rotation progress (shared timing for both line sets)
   const rotationProgress = interpolate(
     frame,
     [GRID_ROTATE_START, GRID_ROTATE_START + GRID_ROTATE_DURATION],
@@ -333,7 +334,22 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
   const easedRotation = Easing.inOut(Easing.cubic)(rotationProgress);
-  const rotation = interpolate(easedRotation, [0, 1], [45, 0]);
+
+  const GRID_LINE_ANGLE_START_1 = 30;
+  const GRID_LINE_ANGLE_END_1 = 90;
+  const GRID_LINE_ANGLE_START_2 = 150;
+  const GRID_LINE_ANGLE_END_2 = 180;
+
+  // First set of lines: 30° → 90° (rotates +60°)
+  const rotation1 = interpolate(easedRotation, [0, 1], [
+    GRID_LINE_ANGLE_START_1,
+    GRID_LINE_ANGLE_END_1,
+  ]);
+  // Second set of lines: 150° → 180° (rotates +30°)
+  const rotation2 = interpolate(easedRotation, [0, 1], [
+    GRID_LINE_ANGLE_START_2,
+    GRID_LINE_ANGLE_END_2,
+  ]);
 
   // Color interpolation from black to shadow-grey
   const colorProgress = appearProgress;
@@ -417,8 +433,8 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
       {/* Clipped container (doesn't rotate) - clips to viewport with center exclusion */}
       <g clipPath="url(#grid-clip)">
         {/* Rotating grid container */}
-        <g transform={`rotate(${rotation})`}>
-          {/* Lines in one direction (will be at 45° initially, 0° after rotation) */}
+        <g transform={`rotate(${rotation1})`}>
+          {/* Lines in one direction (30° initially, 90° after rotation) */}
           {linePositions.map((pos, i) => (
             <line
               key={`h-${i}`}
@@ -430,14 +446,16 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
               strokeWidth={strokeWidth}
             />
           ))}
-          {/* Lines in perpendicular direction (will be at 135° initially, 90° after rotation) */}
+        </g>
+        <g transform={`rotate(${rotation2})`}>
+          {/* Lines in perpendicular direction (120° initially, 180° after rotation) */}
           {linePositions.map((pos, i) => (
             <line
               key={`v-${i}`}
-              x1={pos}
-              y1={-halfView}
-              x2={pos}
-              y2={halfView}
+              x1={-halfView}
+              y1={pos}
+              x2={halfView}
+              y2={pos}
               stroke={gridColor}
               strokeWidth={strokeWidth}
             />
