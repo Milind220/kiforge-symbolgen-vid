@@ -66,11 +66,12 @@ const PINS_SWING_START = FRAME_GROW_START + PINS_SWING_DELAY; // Frame 68
 const PINS_SWING_STAGGER = 2; // Frames between each pin starting to swing
 
 // Cursor drag animation for the last pin (index 5: right side, y=80 - bottom right)
-const CURSOR_DRAG_START = PINS_SWING_START + 5 * PINS_SWING_STAGGER; // When last pin would normally start
-const CURSOR_DRAG_DURATION = 20; // Frames for cursor to drag pin into place
-const CURSOR_START_POS = { x: -300, y: 250 }; // Bottom-left start position (relative to center)
-const CURSOR_FADE_DELAY = 8; // Frames after pin placed before cursor fades
-const CURSOR_FADE_DURATION = 10; // Frames for cursor to fade out
+// Appears after frame snaps and all other pins have flipped out
+const PINS_DONE_FRAME = PINS_SWING_START + 4 * PINS_SWING_STAGGER + 20; // Last regular pin done swinging
+const CURSOR_DRAG_DELAY = 10; // Frames to wait after pins are done
+const CURSOR_DRAG_START = PINS_DONE_FRAME + CURSOR_DRAG_DELAY;
+const CURSOR_DRAG_DURATION = 25; // Frames for cursor to drag pin into place
+const CURSOR_START_POS = { x: 350, y: 300 }; // Bottom-right start position (relative to center)
 
 // Second text timing ("What if there was a better way?")
 const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
@@ -932,7 +933,7 @@ const SymbolPins: React.FC<{
 // MOUSE CURSOR WITH DRAGGED PIN COMPONENT
 // =============================================================================
 
-// Mouse cursor that drags the last pin (index 4) into place
+// Mouse cursor that drags the last pin (index 5) into place
 const MouseCursorWithPin: React.FC<{
   frame: number;
   strokeColor: string;
@@ -945,32 +946,21 @@ const MouseCursorWithPin: React.FC<{
   const targetX = frameWidth / 2 + pinLength; // Tip of the pin when horizontal
   const targetY = 80; // Bottom right pin (matches bottom left at y=80)
 
-  // Calculate drag progress
+  // Calculate drag progress with easing (slows down as it approaches target)
   const dragProgress = interpolate(
     frame,
     [CURSOR_DRAG_START, CURSOR_DRAG_START + CURSOR_DRAG_DURATION],
     [0, 1],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
-  const easedDrag = Easing.out(Easing.cubic)(dragProgress); // Smooth deceleration
-
-  // Calculate cursor fade
-  const fadeStart = CURSOR_DRAG_START + CURSOR_DRAG_DURATION + CURSOR_FADE_DELAY;
-  const cursorOpacity = interpolate(
-    frame,
-    [fadeStart, fadeStart + CURSOR_FADE_DURATION],
-    [1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
+  const easedDrag = Easing.out(Easing.quad)(dragProgress); // Smooth deceleration like a human
 
   // Current cursor position (interpolate from start to target)
   const cursorX = interpolate(easedDrag, [0, 1], [CURSOR_START_POS.x, targetX]);
   const cursorY = interpolate(easedDrag, [0, 1], [CURSOR_START_POS.y, targetY]);
 
-  // Pin rotation: starts pointing down-left, ends horizontal
-  // At start: pin points roughly toward bottom-left (about -135°)
-  // At end: pin is horizontal (0°)
-  const pinRotation = interpolate(easedDrag, [0, 1], [-120, 0]);
+  // Pin rotation: starts pointing up-left (coming from bottom-right), ends horizontal
+  const pinRotation = interpolate(easedDrag, [0, 1], [135, 0]);
 
   // Don't render before animation starts
   if (frame < CURSOR_DRAG_START) return null;
@@ -1021,7 +1011,6 @@ const MouseCursorWithPin: React.FC<{
           left: `calc(50% + ${cursorX}px)`,
           top: `calc(50% + ${cursorY}px)`,
           transform: "translate(-6px, -6px)", // Offset so tip is at exact position
-          opacity: cursorOpacity,
         }}
       >
         {/* Classic arrow cursor shape - scaled up via viewBox */}
