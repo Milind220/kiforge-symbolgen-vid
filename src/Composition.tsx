@@ -65,6 +65,13 @@ const PINS_SWING_DELAY = 6; // Frames after frame growth starts (when spring fir
 const PINS_SWING_START = FRAME_GROW_START + PINS_SWING_DELAY; // Frame 68
 const PINS_SWING_STAGGER = 2; // Frames between each pin starting to swing
 
+// Cursor drag animation for the last pin (index 5: right side, y=80 - bottom right)
+const CURSOR_DRAG_START = PINS_SWING_START + 5 * PINS_SWING_STAGGER; // When last pin would normally start
+const CURSOR_DRAG_DURATION = 20; // Frames for cursor to drag pin into place
+const CURSOR_START_POS = { x: -300, y: 250 }; // Bottom-left start position (relative to center)
+const CURSOR_FADE_DELAY = 8; // Frames after pin placed before cursor fades
+const CURSOR_FADE_DURATION = 10; // Frames for cursor to fade out
+
 // Second text timing ("What if there was a better way?")
 const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
 const SECOND_TEXT_START = PINS_SWING_START + SECOND_TEXT_DELAY; // Frame 70
@@ -336,9 +343,9 @@ const SYMBOL_PINS = {
   length: GRID.fineSpacing * 2, // 80px (2 fine increments, 1 coarse increment)
   strokeWidth: 3, // Thinner than frame's 5px
   // Pin positions: y-offset from center of frame (negative = above center, positive = below)
-  // 3 pins on left, 2 pins on right (asymmetrical - right aligns with top two left)
+  // 3 pins on left, 3 pins on right (symmetrical)
   left: [-80, 0, 80], // 3 pins
-  right: [-80, 0], // 2 pins aligned with top two left pins
+  right: [-80, 0, 80], // 3 pins (last one dragged in by cursor)
 } as const;
 
 // =============================================================================
@@ -900,6 +907,9 @@ const SymbolPins: React.FC<{
         // Don't render if animation hasn't started yet
         if (frame < pinStartFrame) return null;
 
+        // Skip the last pin (index 5) - it's handled by the cursor drag animation
+        if (index === 5) return null;
+
         return (
           <line
             key={`${side}-${index}`}
@@ -915,6 +925,114 @@ const SymbolPins: React.FC<{
         );
       })}
     </svg>
+  );
+};
+
+// =============================================================================
+// MOUSE CURSOR WITH DRAGGED PIN COMPONENT
+// =============================================================================
+
+// Mouse cursor that drags the last pin (index 4) into place
+const MouseCursorWithPin: React.FC<{
+  frame: number;
+  strokeColor: string;
+}> = ({ frame, strokeColor }) => {
+  const { width: compW, height: compH } = useVideoConfig();
+  const { width: frameWidth } = SYMBOL_FRAME;
+  const { length: pinLength, strokeWidth: pinStrokeWidth } = SYMBOL_PINS;
+
+  // Target position: right edge of frame, y=80 (bottom right pin position)
+  const targetX = frameWidth / 2 + pinLength; // Tip of the pin when horizontal
+  const targetY = 80; // Bottom right pin (matches bottom left at y=80)
+
+  // Calculate drag progress
+  const dragProgress = interpolate(
+    frame,
+    [CURSOR_DRAG_START, CURSOR_DRAG_START + CURSOR_DRAG_DURATION],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+  const easedDrag = Easing.out(Easing.cubic)(dragProgress); // Smooth deceleration
+
+  // Calculate cursor fade
+  const fadeStart = CURSOR_DRAG_START + CURSOR_DRAG_DURATION + CURSOR_FADE_DELAY;
+  const cursorOpacity = interpolate(
+    frame,
+    [fadeStart, fadeStart + CURSOR_FADE_DURATION],
+    [1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  // Current cursor position (interpolate from start to target)
+  const cursorX = interpolate(easedDrag, [0, 1], [CURSOR_START_POS.x, targetX]);
+  const cursorY = interpolate(easedDrag, [0, 1], [CURSOR_START_POS.y, targetY]);
+
+  // Pin rotation: starts pointing down-left, ends horizontal
+  // At start: pin points roughly toward bottom-left (about -135°)
+  // At end: pin is horizontal (0°)
+  const pinRotation = interpolate(easedDrag, [0, 1], [-120, 0]);
+
+  // Don't render before animation starts
+  if (frame < CURSOR_DRAG_START) return null;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: "translate(-50%, -50%)",
+        width: compW,
+        height: compH,
+        pointerEvents: "none",
+      }}
+    >
+      {/* SVG for the dragged pin */}
+      <svg
+        width={compW}
+        height={compH}
+        viewBox={`${-compW / 2} ${-compH / 2} ${compW} ${compH}`}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          overflow: "visible",
+        }}
+      >
+        {/* The dragged pin - positioned at cursor, rotates into place */}
+        <line
+          x1={cursorX - pinLength * Math.cos((pinRotation * Math.PI) / 180)}
+          y1={cursorY - pinLength * Math.sin((pinRotation * Math.PI) / 180)}
+          x2={cursorX}
+          y2={cursorY}
+          stroke={strokeColor}
+          strokeWidth={pinStrokeWidth}
+          strokeLinecap={SYMBOL_FRAME_STROKE.linecap}
+        />
+      </svg>
+
+      {/* Cursor SVG (large exaggerated arrow pointer ~80x80) */}
+      <svg
+        width={80}
+        height={80}
+        viewBox="0 0 24 24"
+        style={{
+          position: "absolute",
+          left: `calc(50% + ${cursorX}px)`,
+          top: `calc(50% + ${cursorY}px)`,
+          transform: "translate(-6px, -6px)", // Offset so tip is at exact position
+          opacity: cursorOpacity,
+        }}
+      >
+        {/* Classic arrow cursor shape - scaled up via viewBox */}
+        <path
+          d="M 0 0 L 0 17 L 4 13 L 7 20 L 10 19 L 7 12 L 12 12 Z"
+          fill={COLORS.white}
+          stroke={COLORS.black}
+          strokeWidth={0.5}
+        />
+      </svg>
+    </div>
   );
 };
 
@@ -1052,6 +1170,9 @@ export const MyComposition: React.FC = () => {
         strokeColor={symbolStrokeColor}
         frameHeight={frameHeight}
       />
+
+      {/* Mouse cursor dragging the last pin into place */}
+      <MouseCursorWithPin frame={frame} strokeColor={symbolStrokeColor} />
 
       {/* Opening text - each letter animates independently */}
       {textVisible && (
