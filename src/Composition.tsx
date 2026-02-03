@@ -47,11 +47,9 @@ const GRID_ROTATE_DURATION = 25; // Frames for grid rotation
 const GRID_FINE_APPEAR_PROGRESS = 0.4; // Fine grid starts appearing at this rotation progress (0-1)
 const GRID_FINE_FADE_DURATION = 10; // Frames for fine grid to fade in
 
-// Offset for subsequent animations (so they shift with GRID_ROTATE_DELAY changes)
-const GRID_TIMING_OFFSET = GRID_ROTATE_DELAY;
-
-// Symbol frame vertical growth animation
-const FRAME_GROW_START = 62 + GRID_TIMING_OFFSET; // Frame when vertical growth begins (offset by grid timing)
+// Symbol frame vertical growth animation (relative to grid rotation for tight coupling)
+const FRAME_GROW_DELAY_FROM_GRID_ROTATE = 5; // Frames after grid starts rotating (adjustable)
+const FRAME_GROW_START = GRID_ROTATE_START + FRAME_GROW_DELAY_FROM_GRID_ROTATE;
 const FRAME_GROW_TARGET_HEIGHT = 320; // Final height after growth (from 240 to 320)
 
 // Symbol frame color transitions
