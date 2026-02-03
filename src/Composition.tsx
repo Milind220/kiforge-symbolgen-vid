@@ -93,8 +93,8 @@ const SECOND_TEXT = "What if there was a better way?";
 const SECOND_LETTERS = SECOND_TEXT.split("");
 
 // Map each letter index to its wordlet index
-// Wordlets: "What", " if", " there", " was", " a", " bet", "ter", " way", "?"
-const SECOND_WORDLET_BOUNDARIES = [0, 4, 7, 13, 17, 19, 23, 26, 30, 31]; // Start indices
+// Wordlets: "Wh", "at", " if", " the", "re", " was", " a", " bet", "ter", " way", "?"
+const SECOND_WORDLET_BOUNDARIES = [0, 2, 4, 7, 11, 13, 17, 19, 23, 26, 30, 31]; // Start indices
 const getSecondWordletIndex = (letterIndex: number): number => {
   for (let i = SECOND_WORDLET_BOUNDARIES.length - 1; i >= 0; i--) {
     if (letterIndex >= SECOND_WORDLET_BOUNDARIES[i]) return i;
