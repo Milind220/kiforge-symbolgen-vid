@@ -41,11 +41,17 @@ const LINE_EXTENSION_END = LINE_EXTENSION_START + LINE_EXTENSION_TOTAL_DURATION;
 // Grid animation timing
 const GRID_APPEAR_START = SYMBOL_FRAME_DONE - 3; // Start appearing slightly before symbol frame completes
 const GRID_APPEAR_DURATION = 15; // Frames for grid to fade in
-const GRID_ROTATE_START = GRID_APPEAR_START; // Rotation starts immediately with appearance
-const GRID_ROTATE_DURATION = 25; // Frames for grid rotation (slightly longer to overlap with fade-in)
+const GRID_ROTATE_DELAY = 4; // Frames to admire the obtuse angle grid before rotation (adjustable)
+const GRID_ROTATE_START = GRID_APPEAR_START + GRID_APPEAR_DURATION + GRID_ROTATE_DELAY; // Rotation starts after appear + delay
+const GRID_ROTATE_DURATION = 25; // Frames for grid rotation
+const GRID_FINE_APPEAR_PROGRESS = 0.4; // Fine grid starts appearing at this rotation progress (0-1)
+const GRID_FINE_FADE_DURATION = 10; // Frames for fine grid to fade in
+
+// Offset for subsequent animations (so they shift with GRID_ROTATE_DELAY changes)
+const GRID_TIMING_OFFSET = GRID_ROTATE_DELAY;
 
 // Symbol frame vertical growth animation
-const FRAME_GROW_START = 62; // Frame when vertical growth begins
+const FRAME_GROW_START = 62 + GRID_TIMING_OFFSET; // Frame when vertical growth begins (offset by grid timing)
 const FRAME_GROW_TARGET_HEIGHT = 320; // Final height after growth (from 240 to 320)
 
 // Symbol frame color transitions
@@ -112,7 +118,7 @@ const TYPOGRAPHY = {
 } as const;
 
 // Symbol frame dimensions (centered around text)
-// Sized to be exactly 6×6 grid increments (240px at 40px spacing)
+// Sized to be 6×6 fine grid increments (240px) or 3×3 coarse increments
 const SYMBOL_FRAME = {
   width: 240,
   height: 240, // Square to align with grid (6 increments)
@@ -263,18 +269,18 @@ const getLineExtensionProgress = (frame: number): number => {
 // GRID CONSTANTS
 // =============================================================================
 const GRID = {
-  spacing: 40, // Distance between parallel lines in pixels (symbol frame = 6×6 increments)
+  coarseSpacing: 80, // Initial coarse grid (symbol frame = 3×3 increments)
+  fineSpacing: 40, // Final fine grid (symbol frame = 6×6 increments)
   strokeWidth: 1.5,
-  // Exclusion zone: coordinate dimensions + strokeWidth (visual bounds) + ~100px breathing room
-  // The strokeWidth extends beyond the coordinate positions, so we account for that
-  exclusionWidth: SYMBOL_FRAME.width + SYMBOL_FRAME.strokeWidth, // 240 + 5 + 105 = 350
-  exclusionHeight: SYMBOL_FRAME.height + SYMBOL_FRAME.strokeWidth, // 240 + 5 + 105 = 350 (now square)
+  // Exclusion zone: coordinate dimensions + strokeWidth (visual bounds)
+  exclusionWidth: SYMBOL_FRAME.width + SYMBOL_FRAME.strokeWidth,
+  exclusionHeight: SYMBOL_FRAME.height + SYMBOL_FRAME.strokeWidth,
 } as const;
 
 // Symbol pins configuration
-// Pins are 2 grid increments long (80px), thinner than frame stroke
+// Pins are 2 fine grid increments (80px) = 1 coarse grid increment
 const SYMBOL_PINS = {
-  length: GRID.spacing * 2, // 80px (2 grid increments)
+  length: GRID.fineSpacing * 2, // 80px (2 fine increments, 1 coarse increment)
   strokeWidth: 3, // Thinner than frame's 5px
   // Pin positions: y-offset from center of frame (negative = above center, positive = below)
   // 3 pins on left, 2 pins on right (asymmetrical - right aligns with top two left)
@@ -288,9 +294,9 @@ const SYMBOL_PINS = {
 
 // Creates a diagonal grid where lines start at 30° and 150° (120° apart)
 // and rotate to 90° and 180° (vertical/horizontal)
-// Lines are clipped to avoid the center exclusion zone
+// Starts with coarse grid (80px), fine interstitial lines (40px) fade in midway through rotation
 const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
-  const { spacing, strokeWidth, exclusionWidth } = GRID;
+  const { coarseSpacing, fineSpacing, strokeWidth, exclusionWidth } = GRID;
   const { width: compW, height: compH, fps } = useVideoConfig();
 
   // Calculate spring-animated exclusion height (follows symbol frame growth)
@@ -334,6 +340,16 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
   const easedRotation = Easing.inOut(Easing.cubic)(rotationProgress);
+
+  // Calculate fine grid appearance (starts midway through rotation)
+  const fineGridStartFrame =
+    GRID_ROTATE_START + GRID_ROTATE_DURATION * GRID_FINE_APPEAR_PROGRESS;
+  const fineGridOpacity = interpolate(
+    frame,
+    [fineGridStartFrame, fineGridStartFrame + GRID_FINE_FADE_DURATION],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
 
   const GRID_LINE_ANGLE_START_1 = 30;
   const GRID_LINE_ANGLE_END_1 = 90;
@@ -380,16 +396,21 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
   if (appearProgress <= 0) return null;
 
   // Grid dimensions (must be large enough to cover viewport at any rotation)
-  // At 45° rotation, we need sqrt(2) * diagonal of viewport
-  // Viewport diagonal = sqrt(1280² + 720²) ≈ 1469, so we need ~2078 minimum
-  const viewportSize = 3000; // Large enough to cover all corners at any angle
+  const viewportSize = 3000;
   const halfView = viewportSize / 2;
 
-  // Generate line positions (centered on 0,0)
-  const lineCount = Math.ceil(viewportSize / spacing) + 2;
-  const linePositions: number[] = [];
-  for (let i = -lineCount; i <= lineCount; i++) {
-    linePositions.push(i * spacing);
+  // Generate coarse line positions (80px spacing, centered on 0,0)
+  const coarseLineCount = Math.ceil(viewportSize / coarseSpacing) + 2;
+  const coarseLinePositions: number[] = [];
+  for (let i = -coarseLineCount; i <= coarseLineCount; i++) {
+    coarseLinePositions.push(i * coarseSpacing);
+  }
+
+  // Generate fine interstitial line positions (offset by fineSpacing from coarse lines)
+  // These sit between the coarse lines to create the 40px grid
+  const fineLinePositions: number[] = [];
+  for (let i = -coarseLineCount; i <= coarseLineCount; i++) {
+    fineLinePositions.push(i * coarseSpacing + fineSpacing);
   }
 
   // Exclusion zone bounds (rectangle in center)
@@ -413,16 +434,15 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
         overflow: "hidden",
       }}
     >
-      {/* Define clip path that excludes the center rectangle - applied at SVG level so it doesn't rotate */}
+      {/* Define clip path that excludes the center rectangle */}
       <defs>
         <clipPath id="grid-clip">
-          {/* Full viewport minus center exclusion */}
           <path
             d={`
               M ${-halfW} ${-halfH} L ${halfW} ${-halfH} L ${halfW} ${halfH} L ${-halfW} ${halfH} Z
-              M ${-exHalfW} ${-exHalfH} 
-              L ${-exHalfW} ${exHalfH} 
-              L ${exHalfW} ${exHalfH} 
+              M ${-exHalfW} ${-exHalfH}
+              L ${-exHalfW} ${exHalfH}
+              L ${exHalfW} ${exHalfH}
               L ${exHalfW} ${-exHalfH} Z
             `}
             fillRule="evenodd"
@@ -430,14 +450,14 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
         </clipPath>
       </defs>
 
-      {/* Clipped container (doesn't rotate) - clips to viewport with center exclusion */}
+      {/* Clipped container */}
       <g clipPath="url(#grid-clip)">
-        {/* Rotating grid container */}
+        {/* First direction lines (30° → 90°) */}
         <g transform={`rotate(${rotation1})`}>
-          {/* Lines in one direction (30° initially, 90° after rotation) */}
-          {linePositions.map((pos, i) => (
+          {/* Coarse lines (always visible) */}
+          {coarseLinePositions.map((pos, i) => (
             <line
-              key={`h-${i}`}
+              key={`h-coarse-${i}`}
               x1={-halfView}
               y1={pos}
               x2={halfView}
@@ -446,12 +466,28 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
               strokeWidth={strokeWidth}
             />
           ))}
+          {/* Fine interstitial lines (fade in midway through rotation) */}
+          {fineGridOpacity > 0 &&
+            fineLinePositions.map((pos, i) => (
+              <line
+                key={`h-fine-${i}`}
+                x1={-halfView}
+                y1={pos}
+                x2={halfView}
+                y2={pos}
+                stroke={gridColor}
+                strokeWidth={strokeWidth}
+                opacity={fineGridOpacity}
+              />
+            ))}
         </g>
+
+        {/* Second direction lines (150° → 180°) */}
         <g transform={`rotate(${rotation2})`}>
-          {/* Lines in perpendicular direction (120° initially, 180° after rotation) */}
-          {linePositions.map((pos, i) => (
+          {/* Coarse lines (always visible) */}
+          {coarseLinePositions.map((pos, i) => (
             <line
-              key={`v-${i}`}
+              key={`v-coarse-${i}`}
               x1={-halfView}
               y1={pos}
               x2={halfView}
@@ -460,6 +496,20 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
               strokeWidth={strokeWidth}
             />
           ))}
+          {/* Fine interstitial lines (fade in midway through rotation) */}
+          {fineGridOpacity > 0 &&
+            fineLinePositions.map((pos, i) => (
+              <line
+                key={`v-fine-${i}`}
+                x1={-halfView}
+                y1={pos}
+                x2={halfView}
+                y2={pos}
+                stroke={gridColor}
+                strokeWidth={strokeWidth}
+                opacity={fineGridOpacity}
+              />
+            ))}
         </g>
       </g>
     </svg>
