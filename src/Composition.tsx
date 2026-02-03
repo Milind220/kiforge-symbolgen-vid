@@ -68,7 +68,7 @@ const PINS_SWING_STAGGER = 2; // Frames between each pin starting to swing
 // Second text timing ("What if there was a better way?")
 const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
 const SECOND_TEXT_START = PINS_SWING_START + SECOND_TEXT_DELAY; // Frame 70
-const SECOND_TEXT_STAGGER = 3; // Frames between each wordlet (same as opening text)
+const SECOND_TEXT_STAGGER = 1; // Frames between each wordlet (same as opening text)
 const SECOND_TEXT_EASE_DURATION = 5; // Frames to ease into position
 
 // =============================================================================
