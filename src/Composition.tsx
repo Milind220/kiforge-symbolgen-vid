@@ -55,6 +55,11 @@ const FILL_COLOR_TRANSITION_START =
 const STROKE_COLOR_TRANSITION_DELAY = 1; // Frames after fill color transition starts
 const STROKE_COLOR_TRANSITION_START =
   FILL_COLOR_TRANSITION_START + STROKE_COLOR_TRANSITION_DELAY; // Frame 66
+const COLOR_TRANSITION_DURATION = 18; // Duration of color spring animations
+
+// Symbol pins timing (swing out after color transitions complete)
+const PINS_SWING_START = FILL_COLOR_TRANSITION_START + COLOR_TRANSITION_DURATION; // Frame 83
+const PINS_SWING_STAGGER = 2; // Frames between each pin starting to swing
 
 // =============================================================================
 // LETTER DATA
@@ -99,6 +104,7 @@ const SYMBOL_FRAME_STROKE = {
   linejoin: "miter" as const,
   shapeRendering: "geometricPrecision" as const,
 } as const;
+
 
 // =============================================================================
 // HELPERS
@@ -204,6 +210,17 @@ const GRID = {
   // The strokeWidth extends beyond the coordinate positions, so we account for that
   exclusionWidth: SYMBOL_FRAME.width + SYMBOL_FRAME.strokeWidth, // 240 + 5 + 105 = 350
   exclusionHeight: SYMBOL_FRAME.height + SYMBOL_FRAME.strokeWidth, // 240 + 5 + 105 = 350 (now square)
+} as const;
+
+// Symbol pins configuration
+// Pins are 2 grid increments long (80px), thinner than frame stroke
+const SYMBOL_PINS = {
+  length: GRID.spacing * 2, // 80px (2 grid increments)
+  strokeWidth: 3, // Thinner than frame's 5px
+  // Pin positions: y-offset from center of frame (negative = above center, positive = below)
+  // 3 pins on left, 2 pins on right (asymmetrical - right aligns with top two left)
+  left: [-80, 0, 80], // 3 pins
+  right: [-80, 0], // 2 pins aligned with top two left pins
 } as const;
 
 // =============================================================================
@@ -533,6 +550,103 @@ const SymbolFrame: React.FC<{
 };
 
 // =============================================================================
+// SYMBOL PINS COMPONENT
+// =============================================================================
+
+// Pins that swing out from the symbol frame edges
+// 3 pins on left (swing left), 2 pins on right (swing right)
+const SymbolPins: React.FC<{
+  frame: number;
+  strokeColor: string;
+  frameHeight: number;
+}> = ({ frame, strokeColor, frameHeight }) => {
+  const { fps } = useVideoConfig();
+  const { width: frameWidth } = SYMBOL_FRAME;
+  const { length, strokeWidth, left: leftPositions, right: rightPositions } = SYMBOL_PINS;
+
+  // Calculate frame edges
+  const leftEdge = -frameWidth / 2;
+  const rightEdge = frameWidth / 2;
+
+  // Build array of all pins with their properties
+  const pins: Array<{
+    side: "left" | "right";
+    yOffset: number;
+    index: number;
+  }> = [
+    ...leftPositions.map((y, i) => ({ side: "left" as const, yOffset: y, index: i })),
+    ...rightPositions.map((y, i) => ({ side: "right" as const, yOffset: y, index: leftPositions.length + i })),
+  ];
+
+  return (
+    <svg
+      width={frameWidth + length * 2} // Frame width + pin length on each side
+      height={frameHeight}
+      viewBox={`${leftEdge - length} ${-frameHeight / 2} ${frameWidth + length * 2} ${frameHeight}`}
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: "translate(-50%, -50%)",
+        overflow: "visible",
+        shapeRendering: SYMBOL_FRAME_STROKE.shapeRendering,
+      }}
+    >
+      {pins.map(({ side, yOffset, index }) => {
+        // Spring animation for this pin (staggered start)
+        const pinStartFrame = PINS_SWING_START + index * PINS_SWING_STAGGER;
+        const swingSpring = spring({
+          fps,
+          frame: frame - pinStartFrame,
+          config: {
+            damping: 12, // Low damping for visible overshoot and small vibration
+            mass: 0.6,
+            stiffness: 180,
+            overshootClamping: false,
+          },
+          durationInFrames: 20,
+        });
+
+        const swingProgress = frame < pinStartFrame ? 0 : swingSpring;
+
+        // Calculate rotation: starts at 90° (flush/hidden), ends at 0° (horizontal)
+        // Left pins rotate from +90° to 0° (swing counterclockwise)
+        // Right pins rotate from -90° to 0° (swing clockwise)
+        const startAngle = side === "left" ? 90 : -90;
+        const rotation = interpolate(swingProgress, [0, 1], [startAngle, 0]);
+
+        // Pin connection point (pivot) is at the frame edge
+        const pivotX = side === "left" ? leftEdge : rightEdge;
+        const pivotY = yOffset;
+
+        // Pin extends outward from pivot
+        const endX = side === "left" ? pivotX - length : pivotX + length;
+
+        // Don't render if animation hasn't started yet
+        if (frame < pinStartFrame) return null;
+
+        return (
+          <line
+            key={`${side}-${index}`}
+            x1={pivotX}
+            y1={pivotY}
+            x2={endX}
+            y2={pivotY}
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap={SYMBOL_FRAME_STROKE.linecap}
+            style={{
+              transformOrigin: `${pivotX}px ${pivotY}px`,
+              transform: `rotate(${rotation}deg)`,
+            }}
+          />
+        );
+      })}
+    </svg>
+  );
+};
+
+// =============================================================================
 // MAIN COMPOSITION
 // =============================================================================
 
@@ -621,6 +735,27 @@ export const MyComposition: React.FC = () => {
   );
   const symbolStrokeColor = `rgb(${strokeR}, ${strokeG}, ${strokeB})`;
 
+  // Calculate frame height for pins (same spring as SymbolFrame uses)
+  const frameGrowthSpring = spring({
+    fps,
+    frame: frame - FRAME_GROW_START,
+    config: {
+      damping: 12,
+      mass: 1,
+      stiffness: 100,
+      overshootClamping: false,
+    },
+    durationInFrames: 15,
+  });
+  const frameHeight =
+    frame < FRAME_GROW_START
+      ? SYMBOL_FRAME.height
+      : interpolate(
+          frameGrowthSpring,
+          [0, 1],
+          [SYMBOL_FRAME.height, FRAME_GROW_TARGET_HEIGHT],
+        );
+
   return (
     <AbsoluteFill
       style={{
@@ -637,6 +772,13 @@ export const MyComposition: React.FC = () => {
         frame={frame}
         fillColor={symbolFillColor}
         strokeColor={symbolStrokeColor}
+      />
+
+      {/* Symbol pins (swing out from frame edges) */}
+      <SymbolPins
+        frame={frame}
+        strokeColor={symbolStrokeColor}
+        frameHeight={frameHeight}
       />
 
       {/* Text - each letter animates independently */}
