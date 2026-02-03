@@ -97,7 +97,7 @@ const LOGO_ZOOM_DELAY = 0; // Frames after main zoom completes
 const LOGO_ZOOM_START = ZOOM_START + ZOOM_DURATION + LOGO_ZOOM_DELAY;
 const LOGO_ZOOM_DURATION = 20; // Frames for logo to zoom in
 const LOGO_INITIAL_SCALE = 0.01; // Start as tiny dot
-const LOGO_FINAL_SIZE = 260; // Final width in pixels (similar to symbolFrame's 240)
+const LOGO_FINAL_SIZE = 380; // Final width in pixels (similar to symbolFrame's 240)
 
 // Second text timing ("What if there was a better way?")
 const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
@@ -1186,9 +1186,9 @@ const KiForgeLogo: React.FC<{ frame: number }> = ({ frame }) => {
     fps,
     frame: frame - LOGO_ZOOM_START,
     config: {
-      damping: 14,
+      damping: 10,
       mass: 1,
-      stiffness: 80,
+      stiffness: 120,
       overshootClamping: false,
     },
     durationInFrames: LOGO_ZOOM_DURATION,
