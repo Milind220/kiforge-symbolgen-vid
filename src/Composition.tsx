@@ -46,6 +46,10 @@ const GRID_ROTATE_DURATION = 25; // Frames for rotation from 45° to 0° (slight
 const FRAME_GROW_START = 62; // Frame when vertical growth begins
 const FRAME_GROW_TARGET_HEIGHT = 320; // Final height after growth (from 240 to 320)
 
+// Background color transition (black to ivory-mist)
+const BG_COLOR_TRANSITION_DELAY = 3; // Frames after frame growth starts
+const BG_COLOR_TRANSITION_START = FRAME_GROW_START + BG_COLOR_TRANSITION_DELAY; // Frame 65
+
 // =============================================================================
 // LETTER DATA
 // =============================================================================
@@ -68,9 +72,16 @@ const getWordletIndex = (letterIndex: number): number => {
 // =============================================================================
 const COLORS = {
   background: "#000000",
+  backgroundLight: "#fdf6e3", // ivory-mist
   text: "#ffffff",
   silver: "#adadad",
   shadowGrey: "#272727",
+} as const;
+
+// RGB values for color interpolation
+const COLOR_RGB = {
+  black: { r: 0, g: 0, b: 0 },
+  ivoryMist: { r: 253, g: 246, b: 227 },
 } as const;
 
 const FONTS = {
@@ -441,14 +452,35 @@ const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
 
 export const MyComposition: React.FC = () => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
   // Text visibility (hidden instantly when line extension starts)
   const textVisible = frame < OPENING_TEXT_DISAPPEAR_START;
 
+  // Background color spring animation (black to ivory-mist with overshoot)
+  const bgColorSpring = spring({
+    fps,
+    frame: frame - BG_COLOR_TRANSITION_START,
+    config: {
+      damping: 14, // Low enough to allow visible overshoot
+      mass: 0.8,
+      stiffness: 100,
+      overshootClamping: false,
+    },
+    durationInFrames: 18, // Ends slightly after frame growth (which is 15 frames)
+  });
+
+  // Interpolate RGB values (spring can overshoot past 1, creating brighter-than-target momentarily)
+  const bgProgress = frame < BG_COLOR_TRANSITION_START ? 0 : bgColorSpring;
+  const bgR = Math.round(interpolate(bgProgress, [0, 1], [COLOR_RGB.black.r, COLOR_RGB.ivoryMist.r]));
+  const bgG = Math.round(interpolate(bgProgress, [0, 1], [COLOR_RGB.black.g, COLOR_RGB.ivoryMist.g]));
+  const bgB = Math.round(interpolate(bgProgress, [0, 1], [COLOR_RGB.black.b, COLOR_RGB.ivoryMist.b]));
+  const backgroundColor = `rgb(${bgR}, ${bgG}, ${bgB})`;
+
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: COLORS.background,
+        backgroundColor,
         justifyContent: "center",
         alignItems: "center",
       }}
