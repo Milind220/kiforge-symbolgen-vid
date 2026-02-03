@@ -41,14 +41,14 @@ const LINE_EXTENSION_END = LINE_EXTENSION_START + LINE_EXTENSION_TOTAL_DURATION;
 // Grid animation timing
 const GRID_APPEAR_START = SYMBOL_FRAME_DONE - 3; // Start appearing slightly before symbol frame completes
 const GRID_APPEAR_DURATION = 15; // Frames for grid to fade in
-const GRID_ROTATE_DELAY = 4; // Frames to admire the obtuse angle grid before rotation (adjustable)
+const GRID_ROTATE_DELAY = 0; // Frames to admire the obtuse angle grid before rotation (adjustable)
 const GRID_ROTATE_START = GRID_APPEAR_START + GRID_APPEAR_DURATION + GRID_ROTATE_DELAY; // Rotation starts after appear + delay
 const GRID_ROTATE_DURATION = 25; // Frames for grid rotation
 const GRID_FINE_APPEAR_PROGRESS = 0.4; // Fine grid starts appearing at this rotation progress (0-1)
 const GRID_FINE_FADE_DURATION = 10; // Frames for fine grid to fade in
 
 // Symbol frame vertical growth animation (relative to grid rotation for tight coupling)
-const FRAME_GROW_DELAY_FROM_GRID_ROTATE = 5; // Frames after grid starts rotating (adjustable)
+const FRAME_GROW_DELAY_FROM_GRID_ROTATE = 10; // Frames after grid starts rotating (adjustable)
 const FRAME_GROW_START = GRID_ROTATE_START + FRAME_GROW_DELAY_FROM_GRID_ROTATE;
 const FRAME_GROW_TARGET_HEIGHT = 320; // Final height after growth (from 240 to 320)
 
@@ -68,7 +68,7 @@ const PINS_SWING_STAGGER = 2; // Frames between each pin starting to swing
 // Cursor drag animation for the last pin (index 5: right side, y=80 - bottom right)
 // Appears after frame snaps and all other pins have flipped out
 const PINS_DONE_FRAME = PINS_SWING_START + 4 * PINS_SWING_STAGGER + 20; // Last regular pin done swinging
-const CURSOR_DRAG_DELAY = 10; // Frames to wait after pins are done
+const CURSOR_DRAG_DELAY = 0; // Frames to wait after pins are done
 const CURSOR_DRAG_START = PINS_DONE_FRAME + CURSOR_DRAG_DELAY;
 const CURSOR_DRAG_DURATION = 25; // Frames for cursor to drag pin into place
 const CURSOR_START_POS = { x: 350, y: 300 }; // Bottom-right start position (relative to center)
@@ -375,7 +375,7 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
     frame: frame - FRAME_GROW_START,
     config: {
       damping: 12,
-      mass: 0.8,
+      mass: 10,
       stiffness: 120,
       overshootClamping: false,
     },
@@ -890,9 +890,9 @@ const SymbolPins: React.FC<{
           fps,
           frame: frame - pinStartFrame,
           config: {
-            damping: 12, // Low damping for visible overshoot and small vibration
+            damping: 15, // Low damping for visible overshoot and small vibration
             mass: 0.6,
-            stiffness: 180,
+            stiffness: 250,
             overshootClamping: false,
           },
           durationInFrames: 20,
