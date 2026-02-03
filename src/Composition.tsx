@@ -86,6 +86,12 @@ const CLICK_SPARK_CONFIG = {
   angles: [-120, -90, -60, -150, -30], // Spread around top-left
 } as const;
 
+// Big zoom animation - zooms into symbol, swaps colors
+const ZOOM_DELAY = 8; // Frames after sparks before zoom starts
+const ZOOM_START = CLICK_SPARK_START + CLICK_SPARK_DURATION + ZOOM_DELAY;
+const ZOOM_DURATION = 18; // Frames for zoom animation
+const ZOOM_SCALE = 15; // How much to scale up (fills screen with symbol interior)
+
 // Second text timing ("What if there was a better way?")
 const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
 const SECOND_TEXT_START = PINS_SWING_START + SECOND_TEXT_DELAY; // Frame 70
@@ -1269,33 +1275,70 @@ export const MyComposition: React.FC = () => {
           [SYMBOL_FRAME.height, FRAME_GROW_TARGET_HEIGHT],
         );
 
+  // Zoom animation - zooms into symbol and swaps background color
+  const zoomProgress = interpolate(
+    frame,
+    [ZOOM_START, ZOOM_START + ZOOM_DURATION],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+  const easedZoom = Easing.inOut(Easing.cubic)(zoomProgress);
+  const zoomScale = interpolate(easedZoom, [0, 1], [1, ZOOM_SCALE]);
+
+  // Background color transitions from dark to ivory-mist during zoom
+  const bgR = Math.round(
+    interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.r, COLOR_RGB.ivoryMist.r]),
+  );
+  const bgG = Math.round(
+    interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.g, COLOR_RGB.ivoryMist.g]),
+  );
+  const bgB = Math.round(
+    interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.b, COLOR_RGB.ivoryMist.b]),
+  );
+  const backgroundColor = `rgb(${bgR}, ${bgG}, ${bgB})`;
+
+  // Hide grid and text during zoom
+  const showGrid = frame < ZOOM_START;
+  const showSecondText = frame >= SECOND_TEXT_START && frame < ZOOM_START;
+
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: COLORS.darkBg,
+        backgroundColor,
         justifyContent: "center",
         alignItems: "center",
       }}
     >
-      {/* Diagonal grid (behind everything) */}
-      <DiagonalGrid frame={frame} />
+      {/* Diagonal grid (behind everything, hidden during zoom) */}
+      {showGrid && <DiagonalGrid frame={frame} />}
 
-      {/* Symbol frame (behind text) */}
-      <SymbolFrame
-        frame={frame}
-        fillColor={symbolFillColor}
-        strokeColor={symbolStrokeColor}
-      />
+      {/* Zoomable container for symbol and cursor */}
+      <div
+        style={{
+          position: "absolute",
+          left: "50%",
+          top: "50%",
+          transform: `translate(-50%, -50%) scale(${zoomScale})`,
+          transformOrigin: "center center",
+        }}
+      >
+        {/* Symbol frame (behind text) */}
+        <SymbolFrame
+          frame={frame}
+          fillColor={symbolFillColor}
+          strokeColor={symbolStrokeColor}
+        />
 
-      {/* Symbol pins (swing out from frame edges) */}
-      <SymbolPins
-        frame={frame}
-        strokeColor={symbolStrokeColor}
-        frameHeight={frameHeight}
-      />
+        {/* Symbol pins (swing out from frame edges) */}
+        <SymbolPins
+          frame={frame}
+          strokeColor={symbolStrokeColor}
+          frameHeight={frameHeight}
+        />
 
-      {/* Mouse cursor dragging the last pin into place */}
-      <MouseCursorWithPin frame={frame} strokeColor={symbolStrokeColor} />
+        {/* Mouse cursor dragging the last pin into place */}
+        <MouseCursorWithPin frame={frame} strokeColor={symbolStrokeColor} />
+      </div>
 
       {/* Opening text - each letter animates independently */}
       {textVisible && (
@@ -1327,7 +1370,7 @@ export const MyComposition: React.FC = () => {
       )}
 
       {/* Second text - centered above symbol frame */}
-      {frame >= SECOND_TEXT_START && (
+      {showSecondText && (
         <div
           style={{
             position: "absolute",

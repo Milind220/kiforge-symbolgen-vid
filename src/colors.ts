@@ -90,4 +90,5 @@ export const COLOR_RGB = {
   blueSlate: hexToRgb(COLORS.blueSlate),
   eggshell: hexToRgb(COLORS.eggshell),
   ivoryMist: hexToRgb(COLORS.ivoryMist),
+  darkBg: hexToRgb(COLORS.darkBg),
 } as const;
