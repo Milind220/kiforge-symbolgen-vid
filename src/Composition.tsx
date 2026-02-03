@@ -959,9 +959,6 @@ const MouseCursorWithPin: React.FC<{
   const cursorX = interpolate(easedDrag, [0, 1], [CURSOR_START_POS.x, targetX]);
   const cursorY = interpolate(easedDrag, [0, 1], [CURSOR_START_POS.y, targetY]);
 
-  // Pin rotation: starts pointing up-left (coming from bottom-right), ends horizontal
-  const pinRotation = interpolate(easedDrag, [0, 1], [135, 0]);
-
   // Don't render before animation starts
   if (frame < CURSOR_DRAG_START) return null;
 
@@ -989,10 +986,10 @@ const MouseCursorWithPin: React.FC<{
           overflow: "visible",
         }}
       >
-        {/* The dragged pin - positioned at cursor, rotates into place */}
+        {/* The dragged pin - always horizontal, extends left from cursor tip */}
         <line
-          x1={cursorX - pinLength * Math.cos((pinRotation * Math.PI) / 180)}
-          y1={cursorY - pinLength * Math.sin((pinRotation * Math.PI) / 180)}
+          x1={cursorX - pinLength}
+          y1={cursorY}
           x2={cursorX}
           y2={cursorY}
           stroke={strokeColor}
