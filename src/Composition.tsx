@@ -4,6 +4,7 @@ import {
   interpolate,
   Easing,
   useVideoConfig,
+  spring,
 } from "remotion";
 
 // =============================================================================
@@ -40,6 +41,10 @@ const GRID_APPEAR_START = SYMBOL_FRAME_DONE - 3; // Start appearing slightly bef
 const GRID_APPEAR_DURATION = 15; // Frames for grid to fade in
 const GRID_ROTATE_START = GRID_APPEAR_START; // Rotation starts immediately with appearance
 const GRID_ROTATE_DURATION = 25; // Frames for rotation from 45° to 0° (slightly longer to overlap with fade-in)
+
+// Symbol frame vertical growth animation
+const FRAME_GROW_START = 62; // Frame when vertical growth begins
+const FRAME_GROW_TARGET_HEIGHT = 320; // Final height after growth (from 240 to 320)
 
 // =============================================================================
 // LETTER DATA
@@ -193,8 +198,27 @@ const GRID = {
 // Creates a diagonal grid that rotates from 45° to 0° (horizontal/vertical)
 // Lines are clipped to avoid the center exclusion zone
 const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
-  const { spacing, strokeWidth, exclusionWidth, exclusionHeight } = GRID;
-  const { width: compW, height: compH } = useVideoConfig();
+  const { spacing, strokeWidth, exclusionWidth } = GRID;
+  const { width: compW, height: compH, fps } = useVideoConfig();
+
+  // Calculate spring-animated exclusion height (follows symbol frame growth)
+  const growthSpring = spring({
+    fps,
+    frame: frame - FRAME_GROW_START,
+    config: {
+      damping: 12,
+      mass: 0.8,
+      stiffness: 120,
+      overshootClamping: false,
+    },
+    durationInFrames: 15,
+  });
+
+  const baseExclusionHeight = SYMBOL_FRAME.height + SYMBOL_FRAME.strokeWidth;
+  const targetExclusionHeight = FRAME_GROW_TARGET_HEIGHT + SYMBOL_FRAME.strokeWidth;
+  const exclusionHeight = frame < FRAME_GROW_START
+    ? baseExclusionHeight
+    : interpolate(growthSpring, [0, 1], [baseExclusionHeight, targetExclusionHeight]);
 
   // Calculate grid appearance (fade in)
   const appearProgress = interpolate(
@@ -318,7 +342,28 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
 // Top group (indices 3-5): left vertical, horizontal, right vertical
 // After suck-in starts, left top extends down and right bottom extends up
 const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
-  const { width, height, verticalArmLength, strokeWidth } = SYMBOL_FRAME;
+  const { width, verticalArmLength, strokeWidth } = SYMBOL_FRAME;
+  const { fps } = useVideoConfig();
+
+  // Calculate spring-animated height (grows from 240 to 320 starting at frame 62)
+  // Spring config tuned for slight overshoot (~5px past target in each direction)
+  const growthSpring = spring({
+    fps,
+    frame: frame - FRAME_GROW_START,
+    config: {
+      damping: 12, // Lower damping allows overshoot
+      mass: 1,
+      stiffness: 100,
+      overshootClamping: false,
+    },
+    durationInFrames: 15,
+  });
+
+  // Before growth starts, use base height; after, interpolate to target
+  const baseHeight = SYMBOL_FRAME.height;
+  const height = frame < FRAME_GROW_START
+    ? baseHeight
+    : interpolate(growthSpring, [0, 1], [baseHeight, FRAME_GROW_TARGET_HEIGHT]);
 
   // Get animation for each of the 6 lines
   const lineAnims = Array.from({ length: 6 }, (_, i) =>
