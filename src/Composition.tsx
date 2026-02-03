@@ -73,6 +73,19 @@ const CURSOR_DRAG_START = PINS_DONE_FRAME + CURSOR_DRAG_DELAY;
 const CURSOR_DRAG_DURATION = 25; // Frames for cursor to drag pin into place
 const CURSOR_START_POS = { x: 350, y: 300 }; // Bottom-right start position (relative to center)
 
+// Click spark animation when cursor places the pin
+const CLICK_SPARK_START = CURSOR_DRAG_START + CURSOR_DRAG_DURATION; // When cursor arrives
+const CLICK_SPARK_DURATION = 12; // Frames for sparks to animate
+const CLICK_SPARK_CONFIG = {
+  count: 5, // Number of spark lines
+  length: 20, // Length of each spark line
+  startRadius: 8, // Starting distance from cursor tip
+  endRadius: 35, // Ending distance from cursor tip
+  strokeWidth: 3,
+  // Angles in degrees (0 = right, 90 = down, radiating from top-left of cursor)
+  angles: [-120, -90, -60, -150, -30], // Spread around top-left
+} as const;
+
 // Second text timing ("What if there was a better way?")
 const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
 const SECOND_TEXT_START = PINS_SWING_START + SECOND_TEXT_DELAY; // Frame 70
@@ -1012,6 +1025,15 @@ const MouseCursorWithPin: React.FC<{
   const cursorX = interpolate(easedDrag, [0, 1], [CURSOR_START_POS.x, targetX]);
   const cursorY = interpolate(easedDrag, [0, 1], [CURSOR_START_POS.y, targetY]);
 
+  // Click spark animation (triggers when cursor arrives at target)
+  const sparkProgress = interpolate(
+    frame,
+    [CLICK_SPARK_START, CLICK_SPARK_START + CLICK_SPARK_DURATION],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+  const showSparks = frame >= CLICK_SPARK_START;
+
   // Don't render before animation starts
   if (frame < CURSOR_DRAG_START) return null;
 
@@ -1083,6 +1105,56 @@ const MouseCursorWithPin: React.FC<{
           strokeWidth={0.5}
         />
       </svg>
+
+      {/* Click spark animation - radiating lines from cursor tip */}
+      {showSparks && (
+        <svg
+          width={compW}
+          height={compH}
+          viewBox={`${-compW / 2} ${-compH / 2} ${compW} ${compH}`}
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            overflow: "visible",
+          }}
+        >
+          {CLICK_SPARK_CONFIG.angles.map((angle, i) => {
+            // Each spark line animates outward from cursor tip
+            const angleRad = (angle * Math.PI) / 180;
+
+            // Animate radius outward
+            const currentRadius = interpolate(
+              sparkProgress,
+              [0, 1],
+              [CLICK_SPARK_CONFIG.startRadius, CLICK_SPARK_CONFIG.endRadius],
+            );
+
+            // Fade out as sparks expand
+            const opacity = interpolate(sparkProgress, [0, 0.3, 1], [0, 1, 0]);
+
+            // Calculate line start and end points
+            const startX = cursorX + Math.cos(angleRad) * currentRadius;
+            const startY = cursorY + Math.sin(angleRad) * currentRadius;
+            const endX = cursorX + Math.cos(angleRad) * (currentRadius + CLICK_SPARK_CONFIG.length);
+            const endY = cursorY + Math.sin(angleRad) * (currentRadius + CLICK_SPARK_CONFIG.length);
+
+            return (
+              <line
+                key={i}
+                x1={startX}
+                y1={startY}
+                x2={endX}
+                y2={endY}
+                stroke={COLORS.teal}
+                strokeWidth={CLICK_SPARK_CONFIG.strokeWidth}
+                strokeLinecap="round"
+                opacity={opacity}
+              />
+            );
+          })}
+        </svg>
+      )}
     </div>
   );
 };
