@@ -352,7 +352,7 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
 // Bottom group (indices 0-2): left vertical, horizontal, right vertical
 // Top group (indices 3-5): left vertical, horizontal, right vertical
 // After suck-in starts, left top extends down and right bottom extends up
-const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
+const SymbolFrame: React.FC<{ frame: number; fillColor: string }> = ({ frame, fillColor }) => {
   const { width, verticalArmLength, strokeWidth } = SYMBOL_FRAME;
   const { fps } = useVideoConfig();
 
@@ -411,6 +411,13 @@ const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
     [right, top, right, top + verticalArmLength, 5], // Top right vertical (static)
   ];
 
+  // Fill rectangle dimensions (inset by half stroke width to sit inside the frame)
+  const fillInset = strokeWidth / 2;
+  const fillLeft = left + fillInset;
+  const fillTop = top + fillInset;
+  const fillWidth = width - strokeWidth;
+  const fillHeight = height - strokeWidth;
+
   return (
     <svg
       width={width}
@@ -424,6 +431,14 @@ const SymbolFrame: React.FC<{ frame: number }> = ({ frame }) => {
         overflow: "visible",
       }}
     >
+      {/* Interior fill rectangle (behind the frame lines) */}
+      <rect
+        x={fillLeft}
+        y={fillTop}
+        width={fillWidth}
+        height={fillHeight}
+        fill={fillColor}
+      />
       {lines.map(([x1, y1, x2, y2, animIndex], i) => {
         const anim = lineAnims[animIndex];
         return (
@@ -470,17 +485,17 @@ export const MyComposition: React.FC = () => {
     durationInFrames: 18, // Ends slightly after frame growth (which is 15 frames)
   });
 
-  // Interpolate RGB values (spring can overshoot past 1, creating brighter-than-target momentarily)
-  const bgProgress = frame < BG_COLOR_TRANSITION_START ? 0 : bgColorSpring;
-  const bgR = Math.round(interpolate(bgProgress, [0, 1], [COLOR_RGB.black.r, COLOR_RGB.ivoryMist.r]));
-  const bgG = Math.round(interpolate(bgProgress, [0, 1], [COLOR_RGB.black.g, COLOR_RGB.ivoryMist.g]));
-  const bgB = Math.round(interpolate(bgProgress, [0, 1], [COLOR_RGB.black.b, COLOR_RGB.ivoryMist.b]));
-  const backgroundColor = `rgb(${bgR}, ${bgG}, ${bgB})`;
+  // Interpolate RGB values for symbol frame fill (spring can overshoot past 1, creating brighter-than-target momentarily)
+  const fillProgress = frame < BG_COLOR_TRANSITION_START ? 0 : bgColorSpring;
+  const fillR = Math.round(interpolate(fillProgress, [0, 1], [COLOR_RGB.black.r, COLOR_RGB.ivoryMist.r]));
+  const fillG = Math.round(interpolate(fillProgress, [0, 1], [COLOR_RGB.black.g, COLOR_RGB.ivoryMist.g]));
+  const fillB = Math.round(interpolate(fillProgress, [0, 1], [COLOR_RGB.black.b, COLOR_RGB.ivoryMist.b]));
+  const symbolFillColor = `rgb(${fillR}, ${fillG}, ${fillB})`;
 
   return (
     <AbsoluteFill
       style={{
-        backgroundColor,
+        backgroundColor: COLORS.background,
         justifyContent: "center",
         alignItems: "center",
       }}
@@ -489,7 +504,7 @@ export const MyComposition: React.FC = () => {
       <DiagonalGrid frame={frame} />
 
       {/* Symbol frame (behind text) */}
-      <SymbolFrame frame={frame} />
+      <SymbolFrame frame={frame} fillColor={symbolFillColor} />
 
       {/* Text - each letter animates independently */}
       {textVisible && (
