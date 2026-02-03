@@ -46,9 +46,11 @@ const GRID_ROTATE_DURATION = 25; // Frames for rotation from 45° to 0° (slight
 const FRAME_GROW_START = 62; // Frame when vertical growth begins
 const FRAME_GROW_TARGET_HEIGHT = 320; // Final height after growth (from 240 to 320)
 
-// Background color transition (black to ivory-mist)
-const BG_COLOR_TRANSITION_DELAY = 3; // Frames after frame growth starts
-const BG_COLOR_TRANSITION_START = FRAME_GROW_START + BG_COLOR_TRANSITION_DELAY; // Frame 65
+// Symbol frame color transitions
+const FILL_COLOR_TRANSITION_DELAY = 3; // Frames after frame growth starts
+const FILL_COLOR_TRANSITION_START = FRAME_GROW_START + FILL_COLOR_TRANSITION_DELAY; // Frame 65
+const STROKE_COLOR_TRANSITION_DELAY = 1; // Frames after fill color transition starts
+const STROKE_COLOR_TRANSITION_START = FILL_COLOR_TRANSITION_START + STROKE_COLOR_TRANSITION_DELAY; // Frame 66
 
 // =============================================================================
 // LETTER DATA
@@ -75,6 +77,7 @@ const COLORS = {
   backgroundLight: "#fdf6e3", // ivory-mist
   text: "#ffffff",
   silver: "#adadad",
+  blueSlate: "#526f76",
   shadowGrey: "#272727",
 } as const;
 
@@ -82,6 +85,8 @@ const COLORS = {
 const COLOR_RGB = {
   black: { r: 0, g: 0, b: 0 },
   ivoryMist: { r: 253, g: 246, b: 227 },
+  silver: { r: 173, g: 173, b: 173 },
+  blueSlate: { r: 82, g: 111, b: 118 },
 } as const;
 
 const FONTS = {
@@ -352,7 +357,7 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
 // Bottom group (indices 0-2): left vertical, horizontal, right vertical
 // Top group (indices 3-5): left vertical, horizontal, right vertical
 // After suck-in starts, left top extends down and right bottom extends up
-const SymbolFrame: React.FC<{ frame: number; fillColor: string }> = ({ frame, fillColor }) => {
+const SymbolFrame: React.FC<{ frame: number; fillColor: string; strokeColor: string }> = ({ frame, fillColor, strokeColor }) => {
   const { width, verticalArmLength, strokeWidth } = SYMBOL_FRAME;
   const { fps } = useVideoConfig();
 
@@ -448,7 +453,7 @@ const SymbolFrame: React.FC<{ frame: number; fillColor: string }> = ({ frame, fi
             y1={y1}
             x2={x2}
             y2={y2}
-            stroke={COLORS.silver}
+            stroke={strokeColor}
             strokeWidth={strokeWidth}
             style={{
               transform: `translateY(${anim.yOffset}px)`,
@@ -472,10 +477,10 @@ export const MyComposition: React.FC = () => {
   // Text visibility (hidden instantly when line extension starts)
   const textVisible = frame < OPENING_TEXT_DISAPPEAR_START;
 
-  // Background color spring animation (black to ivory-mist with overshoot)
-  const bgColorSpring = spring({
+  // Fill color spring animation (black to ivory-mist with overshoot)
+  const fillColorSpring = spring({
     fps,
-    frame: frame - BG_COLOR_TRANSITION_START,
+    frame: frame - FILL_COLOR_TRANSITION_START,
     config: {
       damping: 14, // Low enough to allow visible overshoot
       mass: 0.8,
@@ -486,11 +491,31 @@ export const MyComposition: React.FC = () => {
   });
 
   // Interpolate RGB values for symbol frame fill (spring can overshoot past 1, creating brighter-than-target momentarily)
-  const fillProgress = frame < BG_COLOR_TRANSITION_START ? 0 : bgColorSpring;
+  const fillProgress = frame < FILL_COLOR_TRANSITION_START ? 0 : fillColorSpring;
   const fillR = Math.round(interpolate(fillProgress, [0, 1], [COLOR_RGB.black.r, COLOR_RGB.ivoryMist.r]));
   const fillG = Math.round(interpolate(fillProgress, [0, 1], [COLOR_RGB.black.g, COLOR_RGB.ivoryMist.g]));
   const fillB = Math.round(interpolate(fillProgress, [0, 1], [COLOR_RGB.black.b, COLOR_RGB.ivoryMist.b]));
   const symbolFillColor = `rgb(${fillR}, ${fillG}, ${fillB})`;
+
+  // Stroke color spring animation (silver to blue-slate with overshoot, 1 frame offset from fill)
+  const strokeColorSpring = spring({
+    fps,
+    frame: frame - STROKE_COLOR_TRANSITION_START,
+    config: {
+      damping: 14,
+      mass: 0.8,
+      stiffness: 100,
+      overshootClamping: false,
+    },
+    durationInFrames: 18,
+  });
+
+  // Interpolate RGB values for symbol frame stroke
+  const strokeProgress = frame < STROKE_COLOR_TRANSITION_START ? 0 : strokeColorSpring;
+  const strokeR = Math.round(interpolate(strokeProgress, [0, 1], [COLOR_RGB.silver.r, COLOR_RGB.blueSlate.r]));
+  const strokeG = Math.round(interpolate(strokeProgress, [0, 1], [COLOR_RGB.silver.g, COLOR_RGB.blueSlate.g]));
+  const strokeB = Math.round(interpolate(strokeProgress, [0, 1], [COLOR_RGB.silver.b, COLOR_RGB.blueSlate.b]));
+  const symbolStrokeColor = `rgb(${strokeR}, ${strokeG}, ${strokeB})`;
 
   return (
     <AbsoluteFill
@@ -504,7 +529,7 @@ export const MyComposition: React.FC = () => {
       <DiagonalGrid frame={frame} />
 
       {/* Symbol frame (behind text) */}
-      <SymbolFrame frame={frame} fillColor={symbolFillColor} />
+      <SymbolFrame frame={frame} fillColor={symbolFillColor} strokeColor={symbolStrokeColor} />
 
       {/* Text - each letter animates independently */}
       {textVisible && (

@@ -49,6 +49,34 @@
   font-style: normal;
 }
 
+:root {
+  /* Base colors */
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-shadow-grey: #272727;
+  --color-silver: #adadad;
+  --color-teal: #008282;
+  --color-blue-slate: #526f76;
+  --color-eggshell: #eee8d5;
+  --color-ivory-mist: #fdf6e3;
+
+  /* Dark mode semantic colors */
+  --color-dark-bg: #000000;
+  --color-dark-bg-secondary: #272727;
+  --color-dark-text: #ffffff;
+  --color-dark-element: #adadad;
+  --color-dark-highlight: #008282;
+  --color-dark-blue-slate: #526f76;
+
+  /* Light mode semantic colors */
+  --color-light-bg: #fdf6e3;
+  --color-light-bg-secondary: #eee8d5;
+  --color-light-text: #000000;
+  --color-light-element: #272727;
+  --color-light-highlight: #008282;
+  --color-light-blue-slate: #526f76;
+}
+
 @theme {
   /* Fonts */
   --font-sans: "Geist", system-ui, sans-serif;
@@ -59,6 +87,7 @@
   --color-shadow-grey: #272727;
   --color-silver: #adadad;
   --color-teal: #008282;
+  --color-blue-slate: #526f76;
   --color-eggshell: #eee8d5;
   --color-ivory-mist: #fdf6e3;
 
