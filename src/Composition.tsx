@@ -92,6 +92,13 @@ const ZOOM_START = CLICK_SPARK_START + CLICK_SPARK_DURATION + ZOOM_DELAY;
 const ZOOM_DURATION = 18; // Frames for zoom animation
 const ZOOM_SCALE = 15; // How much to scale up (fills screen with symbol interior)
 
+// Logo zoom animation - appears after main zoom, grows from tiny dot
+const LOGO_ZOOM_DELAY = 0; // Frames after main zoom completes
+const LOGO_ZOOM_START = ZOOM_START + ZOOM_DURATION + LOGO_ZOOM_DELAY;
+const LOGO_ZOOM_DURATION = 20; // Frames for logo to zoom in
+const LOGO_INITIAL_SCALE = 0.01; // Start as tiny dot
+const LOGO_FINAL_SIZE = 260; // Final width in pixels (similar to symbolFrame's 240)
+
 // Second text timing ("What if there was a better way?")
 const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
 const SECOND_TEXT_START = PINS_SWING_START + SECOND_TEXT_DELAY; // Frame 70
@@ -1166,6 +1173,78 @@ const MouseCursorWithPin: React.FC<{
 };
 
 // =============================================================================
+// KIFORGE LOGO COMPONENT
+// =============================================================================
+
+// KiForge logo - IC symbol shape with center rectangle and side arms
+// Zooms in from a tiny dot after the main zoom animation
+const KiForgeLogo: React.FC<{ frame: number }> = ({ frame }) => {
+  const { fps } = useVideoConfig();
+
+  // Spring animation for the zoom-in effect
+  const logoSpring = spring({
+    fps,
+    frame: frame - LOGO_ZOOM_START,
+    config: {
+      damping: 14,
+      mass: 1,
+      stiffness: 80,
+      overshootClamping: false,
+    },
+    durationInFrames: LOGO_ZOOM_DURATION,
+  });
+
+  // Don't render before animation starts
+  if (frame < LOGO_ZOOM_START) return null;
+
+  // Interpolate scale from tiny to full size
+  const scale = interpolate(
+    logoSpring,
+    [0, 1],
+    [LOGO_INITIAL_SCALE, 1],
+  );
+
+  // Logo dimensions (based on the 100x100 viewBox, scaled to final size)
+  const logoSize = LOGO_FINAL_SIZE;
+
+  // Slight opacity fade-in at the very start
+  const opacity = interpolate(
+    frame,
+    [LOGO_ZOOM_START, LOGO_ZOOM_START + 3],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: `translate(-50%, -50%) scale(${scale})`,
+        transformOrigin: "center center",
+        opacity,
+      }}
+    >
+      <svg
+        width={logoSize}
+        height={logoSize}
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {/* Main center rectangle */}
+        <rect x="25" y="20" width="50" height="60" fill={COLORS.blueSlate} />
+        {/* Left arm */}
+        <rect x="0" y="42" width="25" height="16" fill={COLORS.blueSlate} />
+        {/* Right arm */}
+        <rect x="75" y="42" width="25" height="16" fill={COLORS.blueSlate} />
+      </svg>
+    </div>
+  );
+};
+
+// =============================================================================
 // MAIN COMPOSITION
 // =============================================================================
 
@@ -1301,6 +1380,9 @@ export const MyComposition: React.FC = () => {
   const showGrid = frame < ZOOM_START;
   const showSecondText = frame >= SECOND_TEXT_START && frame < ZOOM_START;
 
+  // Hide the zoomed symbol frame when logo starts appearing
+  const showSymbolFrame = frame < LOGO_ZOOM_START;
+
   return (
     <AbsoluteFill
       style={{
@@ -1313,32 +1395,37 @@ export const MyComposition: React.FC = () => {
       {showGrid && <DiagonalGrid frame={frame} />}
 
       {/* Zoomable container for symbol and cursor */}
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          top: "50%",
-          transform: `translate(-50%, -50%) scale(${zoomScale})`,
-          transformOrigin: "center center",
-        }}
-      >
-        {/* Symbol frame (behind text) */}
-        <SymbolFrame
-          frame={frame}
-          fillColor={symbolFillColor}
-          strokeColor={symbolStrokeColor}
-        />
+      {showSymbolFrame && (
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            transform: `translate(-50%, -50%) scale(${zoomScale})`,
+            transformOrigin: "center center",
+          }}
+        >
+          {/* Symbol frame (behind text) */}
+          <SymbolFrame
+            frame={frame}
+            fillColor={symbolFillColor}
+            strokeColor={symbolStrokeColor}
+          />
 
-        {/* Symbol pins (swing out from frame edges) */}
-        <SymbolPins
-          frame={frame}
-          strokeColor={symbolStrokeColor}
-          frameHeight={frameHeight}
-        />
+          {/* Symbol pins (swing out from frame edges) */}
+          <SymbolPins
+            frame={frame}
+            strokeColor={symbolStrokeColor}
+            frameHeight={frameHeight}
+          />
 
-        {/* Mouse cursor dragging the last pin into place */}
-        <MouseCursorWithPin frame={frame} strokeColor={symbolStrokeColor} />
-      </div>
+          {/* Mouse cursor dragging the last pin into place */}
+          <MouseCursorWithPin frame={frame} strokeColor={symbolStrokeColor} />
+        </div>
+      )}
+
+      {/* KiForge logo - zooms in after main zoom animation */}
+      <KiForgeLogo frame={frame} />
 
       {/* Opening text - each letter animates independently */}
       {textVisible && (
