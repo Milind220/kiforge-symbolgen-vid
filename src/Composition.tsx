@@ -6,6 +6,7 @@ import {
   useVideoConfig,
   spring,
 } from "remotion";
+import { COLORS, COLOR_RGB } from "./colors";
 
 // =============================================================================
 // TIMING CONSTANTS (in frames)
@@ -32,7 +33,8 @@ const SYMBOL_FRAME_DONE =
 const LINE_EXTENSION_DELAY = 2; // Frames to wait after symbol frame is complete
 const OPENING_TEXT_DISAPPEAR_DELAY = 4; // Frames to wait after line extension starts
 const LINE_EXTENSION_START = SYMBOL_FRAME_DONE + LINE_EXTENSION_DELAY; // When lines start extending & text starts moving
-const OPENING_TEXT_DISAPPEAR_START = LINE_EXTENSION_START + OPENING_TEXT_DISAPPEAR_DELAY; // When opening text starts disappearing
+const OPENING_TEXT_DISAPPEAR_START =
+  LINE_EXTENSION_START + OPENING_TEXT_DISAPPEAR_DELAY; // When opening text starts disappearing
 const LINE_EXTENSION_TOTAL_DURATION = 10; // Frames for furthest letter to reach line
 const LINE_EXTENSION_END = LINE_EXTENSION_START + LINE_EXTENSION_TOTAL_DURATION;
 
@@ -48,9 +50,11 @@ const FRAME_GROW_TARGET_HEIGHT = 320; // Final height after growth (from 240 to 
 
 // Symbol frame color transitions
 const FILL_COLOR_TRANSITION_DELAY = 3; // Frames after frame growth starts
-const FILL_COLOR_TRANSITION_START = FRAME_GROW_START + FILL_COLOR_TRANSITION_DELAY; // Frame 65
+const FILL_COLOR_TRANSITION_START =
+  FRAME_GROW_START + FILL_COLOR_TRANSITION_DELAY; // Frame 65
 const STROKE_COLOR_TRANSITION_DELAY = 1; // Frames after fill color transition starts
-const STROKE_COLOR_TRANSITION_START = FILL_COLOR_TRANSITION_START + STROKE_COLOR_TRANSITION_DELAY; // Frame 66
+const STROKE_COLOR_TRANSITION_START =
+  FILL_COLOR_TRANSITION_START + STROKE_COLOR_TRANSITION_DELAY; // Frame 66
 
 // =============================================================================
 // LETTER DATA
@@ -72,22 +76,7 @@ const getWordletIndex = (letterIndex: number): number => {
 // =============================================================================
 // STYLE CONSTANTS
 // =============================================================================
-const COLORS = {
-  background: "#000000",
-  backgroundLight: "#fdf6e3", // ivory-mist
-  text: "#ffffff",
-  silver: "#adadad",
-  blueSlate: "#526f76",
-  shadowGrey: "#272727",
-} as const;
-
-// RGB values for color interpolation
-const COLOR_RGB = {
-  black: { r: 0, g: 0, b: 0 },
-  ivoryMist: { r: 253, g: 246, b: 227 },
-  silver: { r: 173, g: 173, b: 173 },
-  blueSlate: { r: 82, g: 111, b: 118 },
-} as const;
+// Colors are imported from src/colors.ts (which reads from Tailwind v4 @theme colors)
 
 const FONTS = {
   sans: "Geist, system-ui, sans-serif",
@@ -187,10 +176,15 @@ const getLineExtensionProgress = (frame: number): number => {
   if (frame < LINE_EXTENSION_START) return 0;
   if (frame >= LINE_EXTENSION_END) return 1;
 
-  const progress = interpolate(frame, [LINE_EXTENSION_START, LINE_EXTENSION_END], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const progress = interpolate(
+    frame,
+    [LINE_EXTENSION_START, LINE_EXTENSION_END],
+    [0, 1],
+    {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    },
+  );
   // Smooth ease for line drawing
   return Easing.inOut(Easing.cubic)(progress);
 };
@@ -231,17 +225,23 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
   });
 
   const baseExclusionHeight = SYMBOL_FRAME.height + SYMBOL_FRAME.strokeWidth;
-  const targetExclusionHeight = FRAME_GROW_TARGET_HEIGHT + SYMBOL_FRAME.strokeWidth;
-  const exclusionHeight = frame < FRAME_GROW_START
-    ? baseExclusionHeight
-    : interpolate(growthSpring, [0, 1], [baseExclusionHeight, targetExclusionHeight]);
+  const targetExclusionHeight =
+    FRAME_GROW_TARGET_HEIGHT + SYMBOL_FRAME.strokeWidth;
+  const exclusionHeight =
+    frame < FRAME_GROW_START
+      ? baseExclusionHeight
+      : interpolate(
+          growthSpring,
+          [0, 1],
+          [baseExclusionHeight, targetExclusionHeight],
+        );
 
   // Calculate grid appearance (fade in)
   const appearProgress = interpolate(
     frame,
     [GRID_APPEAR_START, GRID_APPEAR_START + GRID_APPEAR_DURATION],
     [0, 1],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
   // Calculate rotation (45° to 0°, clockwise)
@@ -249,16 +249,34 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
     frame,
     [GRID_ROTATE_START, GRID_ROTATE_START + GRID_ROTATE_DURATION],
     [0, 1],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
   const easedRotation = Easing.inOut(Easing.cubic)(rotationProgress);
   const rotation = interpolate(easedRotation, [0, 1], [45, 0]);
 
   // Color interpolation from black to shadow-grey
   const colorProgress = appearProgress;
-  const r = Math.round(interpolate(colorProgress, [0, 1], [0, 0x27]));
-  const g = Math.round(interpolate(colorProgress, [0, 1], [0, 0x27]));
-  const b = Math.round(interpolate(colorProgress, [0, 1], [0, 0x27]));
+  const r = Math.round(
+    interpolate(
+      colorProgress,
+      [0, 1],
+      [COLOR_RGB.black.r, COLOR_RGB.shadowGrey.r],
+    ),
+  );
+  const g = Math.round(
+    interpolate(
+      colorProgress,
+      [0, 1],
+      [COLOR_RGB.black.g, COLOR_RGB.shadowGrey.g],
+    ),
+  );
+  const b = Math.round(
+    interpolate(
+      colorProgress,
+      [0, 1],
+      [COLOR_RGB.black.b, COLOR_RGB.shadowGrey.b],
+    ),
+  );
   const gridColor = `rgb(${r}, ${g}, ${b})`;
 
   // Don't render if not yet visible
@@ -357,7 +375,11 @@ const DiagonalGrid: React.FC<{ frame: number }> = ({ frame }) => {
 // Bottom group (indices 0-2): left vertical, horizontal, right vertical
 // Top group (indices 3-5): left vertical, horizontal, right vertical
 // After suck-in starts, left top extends down and right bottom extends up
-const SymbolFrame: React.FC<{ frame: number; fillColor: string; strokeColor: string }> = ({ frame, fillColor, strokeColor }) => {
+const SymbolFrame: React.FC<{
+  frame: number;
+  fillColor: string;
+  strokeColor: string;
+}> = ({ frame, fillColor, strokeColor }) => {
   const { width, verticalArmLength, strokeWidth } = SYMBOL_FRAME;
   const { fps } = useVideoConfig();
 
@@ -377,9 +399,14 @@ const SymbolFrame: React.FC<{ frame: number; fillColor: string; strokeColor: str
 
   // Before growth starts, use base height; after, interpolate to target
   const baseHeight = SYMBOL_FRAME.height;
-  const height = frame < FRAME_GROW_START
-    ? baseHeight
-    : interpolate(growthSpring, [0, 1], [baseHeight, FRAME_GROW_TARGET_HEIGHT]);
+  const height =
+    frame < FRAME_GROW_START
+      ? baseHeight
+      : interpolate(
+          growthSpring,
+          [0, 1],
+          [baseHeight, FRAME_GROW_TARGET_HEIGHT],
+        );
 
   // Get animation for each of the 6 lines
   const lineAnims = Array.from({ length: 6 }, (_, i) =>
@@ -491,10 +518,29 @@ export const MyComposition: React.FC = () => {
   });
 
   // Interpolate RGB values for symbol frame fill (spring can overshoot past 1, creating brighter-than-target momentarily)
-  const fillProgress = frame < FILL_COLOR_TRANSITION_START ? 0 : fillColorSpring;
-  const fillR = Math.round(interpolate(fillProgress, [0, 1], [COLOR_RGB.black.r, COLOR_RGB.ivoryMist.r]));
-  const fillG = Math.round(interpolate(fillProgress, [0, 1], [COLOR_RGB.black.g, COLOR_RGB.ivoryMist.g]));
-  const fillB = Math.round(interpolate(fillProgress, [0, 1], [COLOR_RGB.black.b, COLOR_RGB.ivoryMist.b]));
+  const fillProgress =
+    frame < FILL_COLOR_TRANSITION_START ? 0 : fillColorSpring;
+  const fillR = Math.round(
+    interpolate(
+      fillProgress,
+      [0, 1],
+      [COLOR_RGB.black.r, COLOR_RGB.ivoryMist.r],
+    ),
+  );
+  const fillG = Math.round(
+    interpolate(
+      fillProgress,
+      [0, 1],
+      [COLOR_RGB.black.g, COLOR_RGB.ivoryMist.g],
+    ),
+  );
+  const fillB = Math.round(
+    interpolate(
+      fillProgress,
+      [0, 1],
+      [COLOR_RGB.black.b, COLOR_RGB.ivoryMist.b],
+    ),
+  );
   const symbolFillColor = `rgb(${fillR}, ${fillG}, ${fillB})`;
 
   // Stroke color spring animation (silver to blue-slate with overshoot, 1 frame offset from fill)
@@ -511,16 +557,35 @@ export const MyComposition: React.FC = () => {
   });
 
   // Interpolate RGB values for symbol frame stroke
-  const strokeProgress = frame < STROKE_COLOR_TRANSITION_START ? 0 : strokeColorSpring;
-  const strokeR = Math.round(interpolate(strokeProgress, [0, 1], [COLOR_RGB.silver.r, COLOR_RGB.blueSlate.r]));
-  const strokeG = Math.round(interpolate(strokeProgress, [0, 1], [COLOR_RGB.silver.g, COLOR_RGB.blueSlate.g]));
-  const strokeB = Math.round(interpolate(strokeProgress, [0, 1], [COLOR_RGB.silver.b, COLOR_RGB.blueSlate.b]));
+  const strokeProgress =
+    frame < STROKE_COLOR_TRANSITION_START ? 0 : strokeColorSpring;
+  const strokeR = Math.round(
+    interpolate(
+      strokeProgress,
+      [0, 1],
+      [COLOR_RGB.silver.r, COLOR_RGB.blueSlate.r],
+    ),
+  );
+  const strokeG = Math.round(
+    interpolate(
+      strokeProgress,
+      [0, 1],
+      [COLOR_RGB.silver.g, COLOR_RGB.blueSlate.g],
+    ),
+  );
+  const strokeB = Math.round(
+    interpolate(
+      strokeProgress,
+      [0, 1],
+      [COLOR_RGB.silver.b, COLOR_RGB.blueSlate.b],
+    ),
+  );
   const symbolStrokeColor = `rgb(${strokeR}, ${strokeG}, ${strokeB})`;
 
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: COLORS.background,
+        backgroundColor: COLORS.darkBg,
         justifyContent: "center",
         alignItems: "center",
       }}
@@ -529,7 +594,11 @@ export const MyComposition: React.FC = () => {
       <DiagonalGrid frame={frame} />
 
       {/* Symbol frame (behind text) */}
-      <SymbolFrame frame={frame} fillColor={symbolFillColor} strokeColor={symbolStrokeColor} />
+      <SymbolFrame
+        frame={frame}
+        fillColor={symbolFillColor}
+        strokeColor={symbolStrokeColor}
+      />
 
       {/* Text - each letter animates independently */}
       {textVisible && (
@@ -537,7 +606,7 @@ export const MyComposition: React.FC = () => {
           style={{
             fontSize: TYPOGRAPHY.fontSize,
             fontFamily: FONTS.sans,
-            color: COLORS.text,
+            color: COLORS.darkText,
           }}
         >
           {LETTERS.map((letter, index) => {
