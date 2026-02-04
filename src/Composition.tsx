@@ -1427,7 +1427,8 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
             borderRadius: 6,
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
+            justifyContent: "flex-start",
+            paddingLeft: 12,
             border: "1px solid #e0e0e0", // Subtle border
           }}
         >
