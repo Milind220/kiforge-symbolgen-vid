@@ -99,6 +99,31 @@ const LOGO_ZOOM_DURATION = 20; // Frames for logo to zoom in
 const LOGO_INITIAL_SCALE = 0.01; // Start as tiny dot
 const LOGO_FINAL_SIZE = 380; // Final width in pixels (similar to symbolFrame's 240)
 
+// Browser window zoom-out animation - reveals the full interface
+const BROWSER_ZOOM_DELAY = 5; // Brief pause after logo zoom completes
+const BROWSER_ZOOM_START = LOGO_ZOOM_START + LOGO_ZOOM_DURATION + BROWSER_ZOOM_DELAY;
+const BROWSER_ZOOM_DURATION = 22; // Frames for zoom-out effect
+const BROWSER_INITIAL_SCALE = 2.5; // Start zoomed in (logo fills most of it)
+const BROWSER_FINAL_SCALE = 1; // End at normal size
+
+// Browser window dimensions
+const BROWSER_WINDOW = {
+  width: 1100, // Browser window width
+  height: 650, // Browser window height
+  titleBarHeight: 52, // Height of title bar with traffic lights + URL
+  borderRadius: 12, // Corner radius for the window
+  shadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)", // 3D shadow effect
+} as const;
+
+// Logo position within browser (top-left of content area)
+const LOGO_CORNER_SIZE = 48; // Final logo size in corner
+const LOGO_CORNER_PADDING = 24; // Distance from content edge
+
+// Search bar animation - appears during browser zoom-out
+const SEARCH_BAR_APPEAR_DELAY = 8; // Frames after browser zoom starts
+const SEARCH_BAR_APPEAR_START = BROWSER_ZOOM_START + SEARCH_BAR_APPEAR_DELAY;
+const SEARCH_BAR_APPEAR_DURATION = 15; // Frames to fade/scale in
+
 // Second text timing ("What if there was a better way?")
 const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
 const SECOND_TEXT_START = PINS_SWING_START + SECOND_TEXT_DELAY; // Frame 70
@@ -1173,12 +1198,29 @@ const MouseCursorWithPin: React.FC<{
 };
 
 // =============================================================================
-// KIFORGE LOGO COMPONENT
+// KIFORGE LOGO (SVG only, used inside browser window)
 // =============================================================================
 
-// KiForge logo - IC symbol shape with center rectangle and side arms
-// Zooms in from a tiny dot after the main zoom animation
-const KiForgeLogo: React.FC<{ frame: number }> = ({ frame }) => {
+const KiForgeLogoSVG: React.FC<{ size: number }> = ({ size }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 100 100"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    {/* IC chip shape - single unified path with no seams */}
+    <path
+      d="M 25 20 L 75 20 L 75 42 L 100 42 L 100 58 L 75 58 L 75 80 L 25 80 L 25 58 L 0 58 L 0 42 L 25 42 Z"
+      fill={COLORS.teal}
+    />
+  </svg>
+);
+
+// =============================================================================
+// STANDALONE LOGO (for initial zoom-in animation)
+// =============================================================================
+
+const StandaloneLogo: React.FC<{ frame: number }> = ({ frame }) => {
   const { fps } = useVideoConfig();
 
   // Spring animation for the zoom-in effect
@@ -1194,20 +1236,12 @@ const KiForgeLogo: React.FC<{ frame: number }> = ({ frame }) => {
     durationInFrames: LOGO_ZOOM_DURATION,
   });
 
-  // Don't render before animation starts
-  if (frame < LOGO_ZOOM_START) return null;
+  // Don't render before animation starts or after browser window appears
+  if (frame < LOGO_ZOOM_START || frame >= BROWSER_ZOOM_START) return null;
 
-  // Interpolate scale from tiny to full size
-  const scale = interpolate(
-    logoSpring,
-    [0, 1],
-    [LOGO_INITIAL_SCALE, 1],
-  );
+  const scale = interpolate(logoSpring, [0, 1], [LOGO_INITIAL_SCALE, 1]);
+  const displaySize = LOGO_FINAL_SIZE * scale;
 
-  // Logo dimensions (based on the 100x100 viewBox, scaled to final size)
-  const logoSize = LOGO_FINAL_SIZE;
-
-  // Slight opacity fade-in at the very start
   const opacity = interpolate(
     frame,
     [LOGO_ZOOM_START, LOGO_ZOOM_START + 3],
@@ -1221,23 +1255,293 @@ const KiForgeLogo: React.FC<{ frame: number }> = ({ frame }) => {
         position: "absolute",
         left: "50%",
         top: "50%",
-        transform: `translate(-50%, -50%) scale(${scale})`,
-        transformOrigin: "center center",
+        transform: "translate(-50%, -50%)",
         opacity,
       }}
     >
-      <svg
-        width={logoSize}
-        height={logoSize}
-        viewBox="0 0 100 100"
-        xmlns="http://www.w3.org/2000/svg"
+      <KiForgeLogoSVG size={displaySize} />
+    </div>
+  );
+};
+
+// =============================================================================
+// BROWSER WINDOW COMPONENT
+// =============================================================================
+
+// macOS-style traffic light colors
+const TRAFFIC_LIGHTS = {
+  red: "#ff5f57",
+  yellow: "#febc2e",
+  green: "#28c840",
+  size: 14,
+  gap: 8,
+} as const;
+
+// Browser window that zooms out from the logo, revealing the full interface
+const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
+  const { fps } = useVideoConfig();
+  const { width, height, titleBarHeight, borderRadius, shadow } = BROWSER_WINDOW;
+
+  // Spring animation for browser zoom-out
+  const zoomSpring = spring({
+    fps,
+    frame: frame - BROWSER_ZOOM_START,
+    config: {
+      damping: 18,
+      mass: 1,
+      stiffness: 120,
+      overshootClamping: false,
+    },
+    durationInFrames: BROWSER_ZOOM_DURATION,
+  });
+
+  // Spring for search bar appearance
+  const searchBarSpring = spring({
+    fps,
+    frame: frame - SEARCH_BAR_APPEAR_START,
+    config: {
+      damping: 15,
+      mass: 0.6,
+      stiffness: 180,
+      overshootClamping: false,
+    },
+    durationInFrames: SEARCH_BAR_APPEAR_DURATION,
+  });
+
+  // Don't render before browser animation starts
+  if (frame < BROWSER_ZOOM_START) return null;
+
+  const zoomProgress = zoomSpring;
+
+  // Scale from zoomed-in to normal
+  const browserScale = interpolate(
+    zoomProgress,
+    [0, 1],
+    [BROWSER_INITIAL_SCALE, BROWSER_FINAL_SCALE],
+  );
+
+  // Opacity fade-in
+  const opacity = interpolate(
+    frame,
+    [BROWSER_ZOOM_START, BROWSER_ZOOM_START + 5],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  // Search bar visibility
+  const showSearchBar = frame >= SEARCH_BAR_APPEAR_START;
+  const searchBarOpacity = showSearchBar
+    ? interpolate(
+        frame,
+        [SEARCH_BAR_APPEAR_START, SEARCH_BAR_APPEAR_START + 8],
+        [0, 1],
+        { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+      )
+    : 0;
+  const searchBarScale = showSearchBar
+    ? interpolate(searchBarSpring, [0, 1], [0.9, 1])
+    : 0.9;
+
+  // Content area dimensions
+  const contentHeight = height - titleBarHeight;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: `translate(-50%, -50%) scale(${browserScale})`,
+        transformOrigin: "center center",
+        opacity,
+        width,
+        height,
+        borderRadius,
+        boxShadow: shadow,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Title bar with traffic lights and URL */}
+      <div
+        style={{
+          height: titleBarHeight,
+          backgroundColor: COLORS.eggshell,
+          display: "flex",
+          alignItems: "center",
+          padding: "0 16px",
+          gap: 16,
+          flexShrink: 0,
+        }}
       >
-        {/* IC chip shape - single unified path with no seams */}
-        <path
-          d="M 25 20 L 75 20 L 75 42 L 100 42 L 100 58 L 75 58 L 75 80 L 25 80 L 25 58 L 0 58 L 0 42 L 25 42 Z"
-          fill={COLORS.teal}
-        />
-      </svg>
+        {/* Traffic lights */}
+        <div style={{ display: "flex", gap: TRAFFIC_LIGHTS.gap }}>
+          <div
+            style={{
+              width: TRAFFIC_LIGHTS.size,
+              height: TRAFFIC_LIGHTS.size,
+              borderRadius: "50%",
+              backgroundColor: TRAFFIC_LIGHTS.red,
+            }}
+          />
+          <div
+            style={{
+              width: TRAFFIC_LIGHTS.size,
+              height: TRAFFIC_LIGHTS.size,
+              borderRadius: "50%",
+              backgroundColor: TRAFFIC_LIGHTS.yellow,
+            }}
+          />
+          <div
+            style={{
+              width: TRAFFIC_LIGHTS.size,
+              height: TRAFFIC_LIGHTS.size,
+              borderRadius: "50%",
+              backgroundColor: TRAFFIC_LIGHTS.green,
+            }}
+          />
+        </div>
+
+        {/* URL bar */}
+        <div
+          style={{
+            flex: 1,
+            height: 32,
+            backgroundColor: COLORS.ivoryMist,
+            borderRadius: 6,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          {/* Lock icon (simple) */}
+          <div
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: "50%",
+              backgroundColor: COLORS.teal,
+            }}
+          />
+          {/* URL text */}
+          <span
+            style={{
+              fontFamily: FONTS.sans,
+              fontSize: 14,
+              color: COLORS.shadowGrey,
+            }}
+          >
+            kiforge.io/symbols
+          </span>
+        </div>
+      </div>
+
+      {/* Content area */}
+      <div
+        style={{
+          flex: 1,
+          backgroundColor: COLORS.ivoryMist,
+          position: "relative",
+          height: contentHeight,
+        }}
+      >
+        {/* Logo in top-left corner */}
+        <div
+          style={{
+            position: "absolute",
+            left: LOGO_CORNER_PADDING,
+            top: LOGO_CORNER_PADDING,
+          }}
+        >
+          <KiForgeLogoSVG size={LOGO_CORNER_SIZE} />
+        </div>
+
+        {/* Search bar in center */}
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            transform: `translate(-50%, -50%) scale(${searchBarScale})`,
+            opacity: searchBarOpacity,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          {/* Search input container */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 24,
+              padding: "14px 20px",
+              backgroundColor: COLORS.eggshell,
+              minWidth: 520,
+            }}
+          >
+            {/* Terminal prompt */}
+            <span
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 18,
+                color: COLORS.teal,
+                userSelect: "none",
+              }}
+            >
+              {">"}
+            </span>
+
+            {/* Placeholder text */}
+            <span
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 18,
+                color: COLORS.silver,
+              }}
+            >
+              start typing to search, e.g. "74HC595"
+            </span>
+          </div>
+
+          {/* Hint text */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 14,
+              color: COLORS.silver,
+              fontFamily: FONTS.sans,
+            }}
+          >
+            <span>press</span>
+            {/* Keyboard key indicator */}
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: 22,
+                minWidth: 22,
+                padding: "0 5px",
+                backgroundColor: COLORS.eggshell,
+                borderRadius: 4,
+                fontFamily: FONTS.sans,
+                fontSize: 13,
+                fontWeight: 500,
+                color: COLORS.shadowGrey,
+              }}
+            >
+              ↵
+            </span>
+            <span>to search</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1362,15 +1666,30 @@ export const MyComposition: React.FC = () => {
   const easedZoom = Easing.inOut(Easing.cubic)(zoomProgress);
   const zoomScale = interpolate(easedZoom, [0, 1], [1, ZOOM_SCALE]);
 
-  // Background color transitions from dark to ivory-mist during zoom
+  // Background color transitions:
+  // Phase 1: dark to ivory-mist during symbol zoom
+  // Phase 2: ivory-mist to shadow-grey when browser window appears
+  const browserZoomProgress = interpolate(
+    frame,
+    [BROWSER_ZOOM_START, BROWSER_ZOOM_START + BROWSER_ZOOM_DURATION],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  // During symbol zoom: dark -> ivory-mist
+  const phase1R = interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.r, COLOR_RGB.ivoryMist.r]);
+  const phase1G = interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.g, COLOR_RGB.ivoryMist.g]);
+  const phase1B = interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.b, COLOR_RGB.ivoryMist.b]);
+
+  // During browser zoom: ivory-mist -> shadow-grey
   const bgR = Math.round(
-    interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.r, COLOR_RGB.ivoryMist.r]),
+    interpolate(browserZoomProgress, [0, 1], [phase1R, COLOR_RGB.shadowGrey.r]),
   );
   const bgG = Math.round(
-    interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.g, COLOR_RGB.ivoryMist.g]),
+    interpolate(browserZoomProgress, [0, 1], [phase1G, COLOR_RGB.shadowGrey.g]),
   );
   const bgB = Math.round(
-    interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.b, COLOR_RGB.ivoryMist.b]),
+    interpolate(browserZoomProgress, [0, 1], [phase1B, COLOR_RGB.shadowGrey.b]),
   );
   const backgroundColor = `rgb(${bgR}, ${bgG}, ${bgB})`;
 
@@ -1422,8 +1741,11 @@ export const MyComposition: React.FC = () => {
         </div>
       )}
 
-      {/* KiForge logo - zooms in after main zoom animation */}
-      <KiForgeLogo frame={frame} />
+      {/* Standalone logo - zooms in from tiny dot, visible until browser window appears */}
+      <StandaloneLogo frame={frame} />
+
+      {/* Browser window - zooms out to reveal the full interface */}
+      <BrowserWindow frame={frame} />
 
       {/* Opening text - each letter animates independently */}
       {textVisible && (
