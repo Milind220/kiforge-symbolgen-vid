@@ -1428,19 +1428,9 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: 8,
             border: "1px solid #e0e0e0", // Subtle border
           }}
         >
-          {/* Lock icon (simple) */}
-          <div
-            style={{
-              width: 12,
-              height: 12,
-              borderRadius: "50%",
-              backgroundColor: COLORS.teal,
-            }}
-          />
           {/* URL text */}
           <span
             style={{
