@@ -1230,15 +1230,13 @@ const KiForgeLogo: React.FC<{ frame: number }> = ({ frame }) => {
         width={logoSize}
         height={logoSize}
         viewBox="0 0 100 100"
-        fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        {/* Main center rectangle */}
-        <rect x="25" y="20" width="50" height="60" fill={COLORS.blueSlate} />
-        {/* Left arm */}
-        <rect x="0" y="42" width="25" height="16" fill={COLORS.blueSlate} />
-        {/* Right arm */}
-        <rect x="75" y="42" width="25" height="16" fill={COLORS.blueSlate} />
+        {/* IC chip shape - single unified path with no seams */}
+        <path
+          d="M 25 20 L 75 20 L 75 42 L 100 42 L 100 58 L 75 58 L 75 80 L 25 80 L 25 58 L 0 58 L 0 42 L 25 42 Z"
+          fill={COLORS.teal}
+        />
       </svg>
     </div>
   );
