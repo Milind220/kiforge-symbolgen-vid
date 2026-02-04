@@ -1369,32 +1369,44 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
     : 0.9;
 
   return (
-    // Outer wrapper handles the 3D tilt with centered origin
+    // Position wrapper: center in screen space (no 3D transforms here)
     <div
       style={{
         position: "absolute",
         left: "50%",
         top: `calc(50% + ${currentVerticalOffset}px)`,
-        transform: `perspective(2000px) translate(-50%, -50%) rotateX(${currentTilt}deg)`,
-        transformOrigin: "center center",
+        transform: "translate(-50%, -50%)",
         width,
         height,
+        perspective: "2000px",
+        perspectiveOrigin: "center center",
       }}
     >
-      {/* Inner container handles scale with content-center origin for logo animation */}
+      {/* 3D tilt wrapper: ensures symmetric perspective on both edges */}
       <div
         style={{
           width: "100%",
           height: "100%",
-          transform: `scale(${browserScale})`,
-          transformOrigin: transformOriginPercent,
-          borderRadius,
-          boxShadow: shadow,
-          overflow: "visible", // Allow overflow at bottom
-          display: "flex",
-          flexDirection: "column",
+          transform: `rotateX(${currentTilt}deg)`,
+          transformOrigin: "center center",
+          transformStyle: "preserve-3d",
         }}
       >
+        {/* Inner container handles scale with content-center origin for logo animation */}
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            transform: `scale(${browserScale})`,
+            transformOrigin: transformOriginPercent,
+            borderRadius,
+            boxShadow: shadow,
+            overflow: "visible", // Allow overflow at bottom
+            display: "flex",
+            flexDirection: "column",
+            backfaceVisibility: "hidden",
+          }}
+        >
       {/* Title bar with traffic lights and URL */}
       <div
         style={{
@@ -1572,6 +1584,7 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
           </div>
         </div>
       </div>
+        </div>
       </div>
     </div>
   );
