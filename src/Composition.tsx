@@ -126,6 +126,11 @@ const SEARCH_BAR_APPEAR_DELAY = 8; // Frames after browser zoom starts
 const SEARCH_BAR_APPEAR_START = BROWSER_ZOOM_START + SEARCH_BAR_APPEAR_DELAY;
 const SEARCH_BAR_APPEAR_DURATION = 15; // Frames to fade/scale in
 
+// Headline text above browser ("Get any symbol < 3 minutes")
+const HEADLINE_APPEAR_DELAY = 12; // Frames after browser zoom starts
+const HEADLINE_APPEAR_START = BROWSER_ZOOM_START + HEADLINE_APPEAR_DELAY;
+const HEADLINE_APPEAR_DURATION = 12; // Frames to fade in
+
 // Second text timing ("What if there was a better way?")
 const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
 const SECOND_TEXT_START = PINS_SWING_START + SECOND_TEXT_DELAY; // Frame 70
@@ -1757,6 +1762,31 @@ export const MyComposition: React.FC = () => {
 
       {/* Browser window - zooms out to reveal the full interface */}
       <BrowserWindow frame={frame} />
+
+      {/* Headline text above browser */}
+      {frame >= HEADLINE_APPEAR_START && (
+        <div
+          style={{
+            position: "absolute",
+            top: `calc(50% - ${BROWSER_WINDOW.height / 2 + 60}px)`,
+            left: "50%",
+            transform: "translateX(-50%)",
+            opacity: interpolate(
+              frame,
+              [HEADLINE_APPEAR_START, HEADLINE_APPEAR_START + HEADLINE_APPEAR_DURATION],
+              [0, 1],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+            ),
+            fontFamily: FONTS.sans,
+            fontSize: 48,
+            fontWeight: 600,
+            color: COLORS.white,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Get any symbol &lt; 3 minutes
+        </div>
+      )}
 
       {/* Opening text - each letter animates independently */}
       {textVisible && (
