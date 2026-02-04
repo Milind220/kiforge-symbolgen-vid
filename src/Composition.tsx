@@ -1768,7 +1768,7 @@ export const MyComposition: React.FC = () => {
         <div
           style={{
             position: "absolute",
-            top: `calc(50% + ${BROWSER_WINDOW.verticalOffset}px - ${BROWSER_WINDOW.height / 2 + 70}px)`,
+            top: `calc(50% + ${BROWSER_WINDOW.verticalOffset}px - ${BROWSER_WINDOW.height / 2 + 90}px)`,
             left: "50%",
             transform: "translateX(-50%)",
             opacity: interpolate(
@@ -1779,7 +1779,7 @@ export const MyComposition: React.FC = () => {
             ),
             fontFamily: FONTS.sans,
             fontSize: 48,
-            fontWeight: 600,
+            fontWeight: 400,
             color: COLORS.white,
             whiteSpace: "nowrap",
           }}
