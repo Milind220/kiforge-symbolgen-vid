@@ -114,7 +114,8 @@ const BROWSER_WINDOW = {
   height: 650, // Browser window height
   titleBarHeight: 52, // Height of title bar with traffic lights + URL
   borderRadius: 12, // Corner radius for the window
-  verticalOffset: 100, // Pixels to lower the screen (positive = down)
+  verticalOffset: 130, // Pixels to lower the screen (positive = down)
+  tiltDegrees: 4, // 3D tilt: positive = top leans back (appears farther)
   shadow: "0 40px 80px -20px rgba(0, 0, 0, 0.5), 0 20px 40px -10px rgba(0, 0, 0, 0.3)", // Stronger floating shadow
 } as const;
 
@@ -1287,7 +1288,7 @@ const TRAFFIC_LIGHTS = {
 // Browser window that zooms out from the logo, revealing the full interface
 const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
   const { fps } = useVideoConfig();
-  const { width, height, titleBarHeight, borderRadius, shadow, verticalOffset } = BROWSER_WINDOW;
+  const { width, height, titleBarHeight, borderRadius, shadow, verticalOffset, tiltDegrees } = BROWSER_WINDOW;
 
   // Spring animation for browser zoom-out
   const zoomSpring = spring({
@@ -1333,6 +1334,9 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
   // Animate vertical offset from 0 to final value (seamless transition)
   const currentVerticalOffset = interpolate(zoomProgress, [0, 1], [0, verticalOffset]);
 
+  // Animate tilt from 0 to final value (seamless transition with zoom)
+  const currentTilt = interpolate(zoomProgress, [0, 1], [0, tiltDegrees]);
+
   // Logo position animation: starts at content-center, moves to corner
   // Content center in browser coords (from top-left of content area)
   const contentCenterX = width / 2;
@@ -1365,22 +1369,32 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
     : 0.9;
 
   return (
+    // Outer wrapper handles the 3D tilt with centered origin
     <div
       style={{
         position: "absolute",
         left: "50%",
         top: `calc(50% + ${currentVerticalOffset}px)`,
-        transform: `translate(-50%, -50%) scale(${browserScale})`,
-        transformOrigin: transformOriginPercent,
+        transform: `perspective(2000px) translate(-50%, -50%) rotateX(${currentTilt}deg)`,
+        transformOrigin: "center center",
         width,
         height,
-        borderRadius,
-        boxShadow: shadow,
-        overflow: "visible", // Allow overflow at bottom
-        display: "flex",
-        flexDirection: "column",
       }}
     >
+      {/* Inner container handles scale with content-center origin for logo animation */}
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          transform: `scale(${browserScale})`,
+          transformOrigin: transformOriginPercent,
+          borderRadius,
+          boxShadow: shadow,
+          overflow: "visible", // Allow overflow at bottom
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
       {/* Title bar with traffic lights and URL */}
       <div
         style={{
@@ -1557,6 +1571,7 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
             <span>to search</span>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -1768,7 +1783,7 @@ export const MyComposition: React.FC = () => {
         <div
           style={{
             position: "absolute",
-            top: `calc(50% + ${BROWSER_WINDOW.verticalOffset}px - ${BROWSER_WINDOW.height / 2 + 90}px)`,
+            top: `calc(50% + ${BROWSER_WINDOW.verticalOffset}px - ${BROWSER_WINDOW.height / 2 + 110}px)`,
             left: "50%",
             transform: "translateX(-50%)",
             opacity: interpolate(
@@ -1777,14 +1792,34 @@ export const MyComposition: React.FC = () => {
               [0, 1],
               { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
             ),
-            fontFamily: FONTS.sans,
-            fontSize: 48,
-            fontWeight: 400,
-            color: COLORS.white,
-            whiteSpace: "nowrap",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 8,
           }}
         >
-          Get any symbol &lt; 3 minutes
+          <span
+            style={{
+              fontFamily: FONTS.sans,
+              fontSize: 48,
+              fontWeight: 300,
+              color: COLORS.white,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Get New Symbols Easily
+          </span>
+          <span
+            style={{
+              fontFamily: FONTS.sans,
+              fontSize: 22,
+              fontWeight: 400,
+              color: COLORS.silver,
+              whiteSpace: "nowrap",
+            }}
+          >
+            symbols an engineer would love
+          </span>
         </div>
       )}
 
