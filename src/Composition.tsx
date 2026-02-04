@@ -114,7 +114,7 @@ const BROWSER_WINDOW = {
   height: 650, // Browser window height
   titleBarHeight: 52, // Height of title bar with traffic lights + URL
   borderRadius: 12, // Corner radius for the window
-  verticalOffset: 60, // Pixels to lower the screen (positive = down)
+  verticalOffset: 100, // Pixels to lower the screen (positive = down)
   shadow: "0 40px 80px -20px rgba(0, 0, 0, 0.5), 0 20px 40px -10px rgba(0, 0, 0, 0.3)", // Stronger floating shadow
 } as const;
 
@@ -1768,7 +1768,7 @@ export const MyComposition: React.FC = () => {
         <div
           style={{
             position: "absolute",
-            top: `calc(50% - ${BROWSER_WINDOW.height / 2 + 60}px)`,
+            top: `calc(50% + ${BROWSER_WINDOW.verticalOffset}px - ${BROWSER_WINDOW.height / 2 + 70}px)`,
             left: "50%",
             transform: "translateX(-50%)",
             opacity: interpolate(
