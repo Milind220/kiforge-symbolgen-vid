@@ -1325,6 +1325,9 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
   // Content area dimensions
   const contentHeight = height - titleBarHeight;
 
+  // Animate vertical offset from 0 to final value (seamless transition)
+  const currentVerticalOffset = interpolate(zoomProgress, [0, 1], [0, verticalOffset]);
+
   // Logo position animation: starts at content-center, moves to corner
   // Content center in browser coords (from top-left of content area)
   const contentCenterX = width / 2;
@@ -1361,7 +1364,7 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
       style={{
         position: "absolute",
         left: "50%",
-        top: `calc(50% + ${verticalOffset}px)`,
+        top: `calc(50% + ${currentVerticalOffset}px)`,
         transform: `translate(-50%, -50%) scale(${browserScale})`,
         transformOrigin: transformOriginPercent,
         width,
