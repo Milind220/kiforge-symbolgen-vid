@@ -100,10 +100,12 @@ const LOGO_INITIAL_SCALE = 0.01; // Start as tiny dot
 const LOGO_FINAL_SIZE = 380; // Final width in pixels (similar to symbolFrame's 240)
 
 // Browser window zoom-out animation - reveals the full interface
-const BROWSER_ZOOM_DELAY = 5; // Brief pause after logo zoom completes
-const BROWSER_ZOOM_START = LOGO_ZOOM_START + LOGO_ZOOM_DURATION + BROWSER_ZOOM_DELAY;
-const BROWSER_ZOOM_DURATION = 22; // Frames for zoom-out effect
-const BROWSER_INITIAL_SCALE = 2.5; // Start zoomed in (logo fills most of it)
+// Starts exactly when logo zoom ends for seamless transition
+const BROWSER_ZOOM_START = LOGO_ZOOM_START + LOGO_ZOOM_DURATION; // No delay
+const BROWSER_ZOOM_DURATION = 25; // Frames for zoom-out effect
+// Calculate initial scale so logo (at 48px) appears at same size as standalone (380px)
+const LOGO_CORNER_SIZE = 48; // Final logo size in corner
+const BROWSER_INITIAL_SCALE = LOGO_FINAL_SIZE / LOGO_CORNER_SIZE; // ~7.92
 const BROWSER_FINAL_SCALE = 1; // End at normal size
 
 // Browser window dimensions
@@ -112,11 +114,11 @@ const BROWSER_WINDOW = {
   height: 650, // Browser window height
   titleBarHeight: 52, // Height of title bar with traffic lights + URL
   borderRadius: 12, // Corner radius for the window
-  shadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)", // 3D shadow effect
+  verticalOffset: 60, // Pixels to lower the screen (positive = down)
+  shadow: "0 40px 80px -20px rgba(0, 0, 0, 0.5), 0 20px 40px -10px rgba(0, 0, 0, 0.3)", // Stronger floating shadow
 } as const;
 
-// Logo position within browser (top-left of content area)
-const LOGO_CORNER_SIZE = 48; // Final logo size in corner
+// Logo position within browser (animates from content-center to corner)
 const LOGO_CORNER_PADDING = 24; // Distance from content edge
 
 // Search bar animation - appears during browser zoom-out
@@ -1280,16 +1282,16 @@ const TRAFFIC_LIGHTS = {
 // Browser window that zooms out from the logo, revealing the full interface
 const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
   const { fps } = useVideoConfig();
-  const { width, height, titleBarHeight, borderRadius, shadow } = BROWSER_WINDOW;
+  const { width, height, titleBarHeight, borderRadius, shadow, verticalOffset } = BROWSER_WINDOW;
 
   // Spring animation for browser zoom-out
   const zoomSpring = spring({
     fps,
     frame: frame - BROWSER_ZOOM_START,
     config: {
-      damping: 18,
-      mass: 1,
-      stiffness: 120,
+      damping: 15,
+      mass: 1.2,
+      stiffness: 80,
       overshootClamping: false,
     },
     durationInFrames: BROWSER_ZOOM_DURATION,
@@ -1320,13 +1322,25 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
     [BROWSER_INITIAL_SCALE, BROWSER_FINAL_SCALE],
   );
 
-  // Opacity fade-in
-  const opacity = interpolate(
-    frame,
-    [BROWSER_ZOOM_START, BROWSER_ZOOM_START + 5],
-    [0, 1],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
+  // Content area dimensions
+  const contentHeight = height - titleBarHeight;
+
+  // Logo position animation: starts at content-center, moves to corner
+  // Content center in browser coords (from top-left of content area)
+  const contentCenterX = width / 2;
+  const contentCenterY = contentHeight / 2;
+  // Corner position
+  const cornerX = LOGO_CORNER_PADDING + LOGO_CORNER_SIZE / 2;
+  const cornerY = LOGO_CORNER_PADDING + LOGO_CORNER_SIZE / 2;
+  // Interpolate logo position
+  const logoX = interpolate(zoomProgress, [0, 1], [contentCenterX, cornerX]);
+  const logoY = interpolate(zoomProgress, [0, 1], [contentCenterY, cornerY]);
+
+  // Transform origin: content-center (so logo stays at screen center during zoom)
+  // Content center from browser top-left: (width/2, titleBarHeight + contentHeight/2)
+  const originX = width / 2;
+  const originY = titleBarHeight + contentHeight / 2;
+  const transformOriginPercent = `${(originX / width) * 100}% ${(originY / height) * 100}%`;
 
   // Search bar visibility
   const showSearchBar = frame >= SEARCH_BAR_APPEAR_START;
@@ -1342,23 +1356,19 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
     ? interpolate(searchBarSpring, [0, 1], [0.9, 1])
     : 0.9;
 
-  // Content area dimensions
-  const contentHeight = height - titleBarHeight;
-
   return (
     <div
       style={{
         position: "absolute",
         left: "50%",
-        top: "50%",
+        top: `calc(50% + ${verticalOffset}px)`,
         transform: `translate(-50%, -50%) scale(${browserScale})`,
-        transformOrigin: "center center",
-        opacity,
+        transformOrigin: transformOriginPercent,
         width,
         height,
         borderRadius,
         boxShadow: shadow,
-        overflow: "hidden",
+        overflow: "visible", // Allow overflow at bottom
         display: "flex",
         flexDirection: "column",
       }}
@@ -1367,12 +1377,14 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
       <div
         style={{
           height: titleBarHeight,
-          backgroundColor: COLORS.eggshell,
+          backgroundColor: "#f5f5f5", // Light grey for realistic URL bar
           display: "flex",
           alignItems: "center",
           padding: "0 16px",
           gap: 16,
           flexShrink: 0,
+          borderTopLeftRadius: borderRadius,
+          borderTopRightRadius: borderRadius,
         }}
       >
         {/* Traffic lights */}
@@ -1408,12 +1420,13 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
           style={{
             flex: 1,
             height: 32,
-            backgroundColor: COLORS.ivoryMist,
+            backgroundColor: "#ffffff", // White URL bar (realistic)
             borderRadius: 6,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: 8,
+            border: "1px solid #e0e0e0", // Subtle border
           }}
         >
           {/* Lock icon (simple) */}
@@ -1445,14 +1458,18 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
           backgroundColor: COLORS.ivoryMist,
           position: "relative",
           height: contentHeight,
+          borderBottomLeftRadius: borderRadius,
+          borderBottomRightRadius: borderRadius,
+          overflow: "hidden",
         }}
       >
-        {/* Logo in top-left corner */}
+        {/* Logo - animates from content-center to top-left corner */}
         <div
           style={{
             position: "absolute",
-            left: LOGO_CORNER_PADDING,
-            top: LOGO_CORNER_PADDING,
+            left: logoX,
+            top: logoY,
+            transform: "translate(-50%, -50%)",
           }}
         >
           <KiForgeLogoSVG size={LOGO_CORNER_SIZE} />
