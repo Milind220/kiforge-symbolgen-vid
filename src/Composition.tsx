@@ -1795,7 +1795,7 @@ export const MyComposition: React.FC = () => {
         <div
           style={{
             position: "absolute",
-            top: `calc(50% + ${BROWSER_WINDOW.verticalOffset}px - ${BROWSER_WINDOW.height / 2 + 110}px)`,
+            top: `calc(50% + ${BROWSER_WINDOW.verticalOffset}px - ${BROWSER_WINDOW.height / 2 + 135}px)`,
             left: "50%",
             transform: "translateX(-50%)",
             opacity: interpolate(
