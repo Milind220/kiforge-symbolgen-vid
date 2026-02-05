@@ -116,7 +116,7 @@ const BROWSER_WINDOW = {
   borderRadius: 12, // Corner radius for the window
   verticalOffset: 130, // Pixels to lower the screen (positive = down)
   tiltDegrees: 4, // 3D tilt: positive = top leans back (appears farther)
-  shadow: "0 0 50px 12px rgba(253, 246, 227, 0.08), 0 0 90px 25px rgba(253, 246, 227, 0.05), 0 0 140px 45px rgba(253, 246, 227, 0.03)", // Screen glow halo (ivory-mist, tight)
+  shadow: "0 0 25px 5px rgba(253, 246, 227, 0.05), 0 0 42px 10px rgba(253, 246, 227, 0.06), 0 0 76px 21px rgba(253, 246, 227, 0.04), 0 0 119px 38px rgba(253, 246, 227, 0.024)", // Screen glow halo (4-layer blend, tight)
 } as const;
 
 // Logo position within browser (animates from content-center to corner)
