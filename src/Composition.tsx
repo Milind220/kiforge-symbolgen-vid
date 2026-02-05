@@ -176,6 +176,9 @@ const SUBTITLE_PHASE_2_START = GENERATING_START; // "wait 2 min or less"
 const SUBTITLE_PHASE_3_START = COMPLETE_START; // "enjoy your symbol"
 const SUBTITLE_TRANSITION_DURATION = 10; // Frames to fade between subtitles
 
+// Flow card sizing
+const FLOW_CARD_SCALE = 1.1; // 10% bigger
+
 // Second text timing ("What if there was a better way?")
 const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
 const SECOND_TEXT_START = PINS_SWING_START + SECOND_TEXT_DELAY; // Frame 70
@@ -1735,6 +1738,8 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
             <div
               style={{
                 width: "100%",
+                transform: `scale(${FLOW_CARD_SCALE})`,
+                transformOrigin: "center center",
                 opacity: interpolate(
                   frame,
                   [GENERATING_START, GENERATING_START + SEARCH_EXIT_DURATION],
@@ -1866,6 +1871,8 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                 width: "100%",
                 backgroundColor: COLORS.eggshell,
                 boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
+                transform: `scale(${FLOW_CARD_SCALE})`,
+                transformOrigin: "center center",
                 opacity: interpolate(
                   frame,
                   [COMPLETE_START, COMPLETE_START + 10],
