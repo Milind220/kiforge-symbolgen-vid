@@ -174,7 +174,9 @@ const SUBTITLE_TEXTS = [
 // Subtitle changes at: generating start, complete start
 const SUBTITLE_PHASE_2_START = GENERATING_START; // "wait 2 min or less"
 const SUBTITLE_PHASE_3_START = COMPLETE_START; // "enjoy your symbol"
-const SUBTITLE_TRANSITION_DURATION = 10; // Frames to fade between subtitles
+const SUBTITLE_COLLAPSE_DURATION = 6; // Frames to rubberband into leftmost letter
+const SUBTITLE_EXPAND_DURATION = 8; // Frames to bounce back out
+const SUBTITLE_CHAR_SPACING = 12; // Mono spacing for letter positions
 
 // Flow card sizing
 const FLOW_CARD_SCALE = 1.1; // 10% bigger
@@ -2168,6 +2170,93 @@ export const MyComposition: React.FC = () => {
   // Hide the zoomed symbol frame when logo starts appearing
   const showSymbolFrame = frame < LOGO_ZOOM_START;
 
+  const renderSubtitle = (
+    text: string,
+    expandStart: number,
+    collapseStart: number | null,
+  ) => {
+    const letters = text.split("");
+    const width = letters.length * SUBTITLE_CHAR_SPACING;
+    const collapseEnd =
+      collapseStart === null
+        ? Number.POSITIVE_INFINITY
+        : collapseStart + SUBTITLE_COLLAPSE_DURATION;
+
+    if (frame < expandStart || frame >= collapseEnd) return null;
+
+    const expandProgress = spring({
+      fps,
+      frame: frame - expandStart,
+      config: { damping: 14, stiffness: 220, mass: 0.6 },
+      durationInFrames: SUBTITLE_EXPAND_DURATION,
+    });
+
+    const collapseProgress =
+      collapseStart === null
+        ? 0
+        : interpolate(
+            frame,
+            [collapseStart, collapseStart + SUBTITLE_COLLAPSE_DURATION],
+            [0, 1],
+            {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+              easing: Easing.in(Easing.cubic),
+            },
+          );
+
+    const positionProgress =
+      collapseStart !== null && frame >= collapseStart
+        ? Math.max(0, 1 - collapseProgress)
+        : expandProgress;
+
+    const squash =
+      collapseStart !== null && frame >= collapseStart
+        ? interpolate(positionProgress, [0, 1], [1.05, 1], {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+          })
+        : interpolate(expandProgress, [0, 1], [0.9, 1], {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+          });
+
+    return (
+      <div
+        style={{
+          position: "absolute",
+          left: "50%",
+          transform: "translateX(-50%)",
+          width,
+          height: 28,
+        }}
+      >
+        {letters.map((char, index) => {
+          const baseX = index * SUBTITLE_CHAR_SPACING;
+          const x = baseX * positionProgress;
+          return (
+            <span
+              key={`${text}-${index}`}
+              style={{
+                position: "absolute",
+                left: 0,
+                transform: `translateX(${x}px) scale(${squash})`,
+                transformOrigin: "left center",
+                fontFamily: FONTS.mono,
+                fontSize: 22,
+                fontWeight: 400,
+                color: COLORS.silver,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {char === " " ? "\u00A0" : char}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <AbsoluteFill
       style={{
@@ -2248,82 +2337,17 @@ export const MyComposition: React.FC = () => {
           </span>
           {/* Subtitle - changes based on flow phase */}
           <div style={{ position: "relative", height: 28 }}>
-            {/* Phase 1: "Search for any part" */}
-            <span
-              style={{
-                position: "absolute",
-                left: "50%",
-                transform: "translateX(-50%)",
-                fontFamily: FONTS.mono,
-                fontSize: 22,
-                fontWeight: 400,
-                color: COLORS.silver,
-                whiteSpace: "nowrap",
-                opacity: frame < SUBTITLE_PHASE_2_START
-                  ? 1
-                  : interpolate(
-                      frame,
-                      [SUBTITLE_PHASE_2_START, SUBTITLE_PHASE_2_START + SUBTITLE_TRANSITION_DURATION],
-                      [1, 0],
-                      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-                    ),
-              }}
-            >
-              {SUBTITLE_TEXTS[0]}
-            </span>
-            {/* Phase 2: "wait 2 min or less" */}
-            <span
-              style={{
-                position: "absolute",
-                left: "50%",
-                transform: "translateX(-50%)",
-                fontFamily: FONTS.mono,
-                fontSize: 22,
-                fontWeight: 400,
-                color: COLORS.silver,
-                whiteSpace: "nowrap",
-                opacity: frame < SUBTITLE_PHASE_2_START
-                  ? 0
-                  : frame < SUBTITLE_PHASE_3_START
-                    ? interpolate(
-                        frame,
-                        [SUBTITLE_PHASE_2_START, SUBTITLE_PHASE_2_START + SUBTITLE_TRANSITION_DURATION],
-                        [0, 1],
-                        { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-                      )
-                    : interpolate(
-                        frame,
-                        [SUBTITLE_PHASE_3_START, SUBTITLE_PHASE_3_START + SUBTITLE_TRANSITION_DURATION],
-                        [1, 0],
-                        { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-                      ),
-              }}
-            >
-              {SUBTITLE_TEXTS[1]}
-            </span>
-            {/* Phase 3: "enjoy your symbol" */}
-            <span
-              style={{
-                position: "absolute",
-                left: "50%",
-                transform: "translateX(-50%)",
-                fontFamily: FONTS.mono,
-                fontSize: 22,
-                fontWeight: 400,
-                color: COLORS.silver,
-                whiteSpace: "nowrap",
-                opacity: frame < SUBTITLE_PHASE_3_START
-                  ? 0
-                  : interpolate(
-                      frame,
-                      [SUBTITLE_PHASE_3_START, SUBTITLE_PHASE_3_START + SUBTITLE_TRANSITION_DURATION],
-                      [0, 1],
-                      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-                    ),
-              }}
-            >
-              {SUBTITLE_TEXTS[2]}
-            </span>
+            {renderSubtitle(SUBTITLE_TEXTS[0], HEADLINE_APPEAR_START, SUBTITLE_PHASE_2_START)}
+            {renderSubtitle(
+              SUBTITLE_TEXTS[1],
+              SUBTITLE_PHASE_2_START + SUBTITLE_COLLAPSE_DURATION,
+              SUBTITLE_PHASE_3_START,
+            )}
+            {renderSubtitle(
+              SUBTITLE_TEXTS[2],
+              SUBTITLE_PHASE_3_START + SUBTITLE_COLLAPSE_DURATION,
+              null,
+            )}
           </div>
         </div>
       )}
