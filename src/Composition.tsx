@@ -102,7 +102,7 @@ const LOGO_FINAL_SIZE = 380; // Final width in pixels (similar to symbolFrame's 
 // Browser window zoom-out animation - reveals the full interface
 // Starts exactly when logo zoom ends for seamless transition
 const BROWSER_ZOOM_START = LOGO_ZOOM_START + LOGO_ZOOM_DURATION; // No delay
-const BROWSER_ZOOM_DURATION = 25; // Frames for zoom-out effect
+const BROWSER_ZOOM_DURATION = 15; // Frames for zoom-out effect
 // Calculate initial scale so logo (at 48px) appears at same size as standalone (380px)
 const LOGO_CORNER_SIZE = 48; // Final logo size in corner
 const BROWSER_INITIAL_SCALE = LOGO_FINAL_SIZE / LOGO_CORNER_SIZE; // ~7.92
@@ -1290,18 +1290,17 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
   const { fps } = useVideoConfig();
   const { width, height, titleBarHeight, borderRadius, shadow, verticalOffset, tiltDegrees } = BROWSER_WINDOW;
 
-  // Spring animation for browser zoom-out
-  const zoomSpring = spring({
-    fps,
-    frame: frame - BROWSER_ZOOM_START,
-    config: {
-      damping: 15,
-      mass: 1.2,
-      stiffness: 80,
-      overshootClamping: false,
-    },
-    durationInFrames: BROWSER_ZOOM_DURATION,
-  });
+  // Ease-out animation for browser zoom-out (fast start, slow finish)
+  const zoomEase = interpolate(
+    frame,
+    [BROWSER_ZOOM_START, BROWSER_ZOOM_START + BROWSER_ZOOM_DURATION],
+    [0, 1],
+    {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.out(Easing.cubic),
+    }
+  );
 
   // Spring for search bar appearance
   const searchBarSpring = spring({
@@ -1319,7 +1318,7 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
   // Don't render before browser animation starts
   if (frame < BROWSER_ZOOM_START) return null;
 
-  const zoomProgress = zoomSpring;
+  const zoomProgress = zoomEase;
 
   // Scale from zoomed-in to normal
   const browserScale = interpolate(
