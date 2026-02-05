@@ -144,7 +144,7 @@ const SEARCH_EXIT_DURATION = 10; // Frames for search bar to fade/slide out
 
 // Phase 2: Generating card (appears as search exits, shows progress 5% → 100%)
 const GENERATING_START = SEARCH_EXIT_START; // Generating fades in as search exits
-const GENERATING_DURATION = 30; // Frames for progress bar to go 5% → 100%
+const GENERATING_DURATION = 50; // Frames for progress bar to go 5% → 100%
 const GENERATING_END = GENERATING_START + GENERATING_DURATION;
 
 // Progress bar phases within generation
@@ -156,6 +156,13 @@ const MESSAGE_SWITCH_PROGRESS = 40;
 // Phase 3: Symbol complete card
 const COMPLETE_APPEAR_DELAY = 12; // Frames after generation ends
 const COMPLETE_START = GENERATING_END + COMPLETE_APPEAR_DELAY;
+
+// Download button highlight animation (animated border tracing around button)
+const DOWNLOAD_HIGHLIGHT_DELAY = 18; // Frames after card appears before highlight starts
+const DOWNLOAD_HIGHLIGHT_START = COMPLETE_START + DOWNLOAD_HIGHLIGHT_DELAY;
+const DOWNLOAD_HIGHLIGHT_DURATION = 20; // Frames for each border segment to animate in
+const DOWNLOAD_HIGHLIGHT_STAGGER = 5; // Frames between each border segment starting
+const DOWNLOAD_HIGHLIGHT_BORDER_WIDTH = 3; // Width of the animated border
 
 // Subtitle text changes (synced with flow phases)
 const SUBTITLE_TEXTS = [
@@ -1248,6 +1255,94 @@ const MouseCursorWithPin: React.FC<{
 };
 
 // =============================================================================
+// ANIMATED BORDER HIGHLIGHT COMPONENT
+// =============================================================================
+
+// Animated border that traces around an element (like a button)
+// 4 segments animate in sequence: top (left→right), right (top→bottom),
+// bottom (right→left), left (bottom→top)
+const AnimatedBorderHighlight: React.FC<{
+  frame: number;
+  startFrame: number;
+  children: React.ReactNode;
+}> = ({ frame, startFrame, children }) => {
+  // Calculate progress for each border segment
+  const getSegmentProgress = (segmentIndex: number): number => {
+    const segmentStart = startFrame + segmentIndex * DOWNLOAD_HIGHLIGHT_STAGGER;
+    if (frame < segmentStart) return 0;
+    const progress = interpolate(
+      frame,
+      [segmentStart, segmentStart + DOWNLOAD_HIGHLIGHT_DURATION],
+      [0, 1],
+      { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+    );
+    return Easing.out(Easing.cubic)(progress);
+  };
+
+  const topProgress = getSegmentProgress(0);
+  const rightProgress = getSegmentProgress(1);
+  const bottomProgress = getSegmentProgress(2);
+  const leftProgress = getSegmentProgress(3);
+
+  // Don't render border until animation starts
+  const showBorder = frame >= startFrame;
+
+  return (
+    <div style={{ position: "relative", overflow: "visible" }}>
+      {children}
+      {showBorder && (
+        <>
+          {/* Top border - animates left to right */}
+          <div
+            style={{
+              position: "absolute",
+              top: -DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
+              left: 0,
+              width: `${topProgress * 100}%`,
+              height: DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
+              backgroundColor: COLORS.black,
+            }}
+          />
+          {/* Right border - animates top to bottom */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              right: -DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
+              width: DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
+              height: `${rightProgress * 100}%`,
+              backgroundColor: COLORS.black,
+            }}
+          />
+          {/* Bottom border - animates right to left */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: -DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
+              right: 0,
+              width: `${bottomProgress * 100}%`,
+              height: DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
+              backgroundColor: COLORS.black,
+            }}
+          />
+          {/* Left border - animates bottom to top */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: -DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
+              width: DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
+              height: `${leftProgress * 100}%`,
+              backgroundColor: COLORS.black,
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+};
+
+// =============================================================================
 // KIFORGE LOGO (SVG only, used inside browser window)
 // =============================================================================
 
@@ -1916,25 +2011,27 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                     {PART_NUMBER}
                   </p>
                 </div>
-                {/* Download button */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "10px 16px",
-                    backgroundColor: "transparent",
-                    boxShadow: `inset 0 0 0 1px ${COLORS.silver}`,
-                    fontFamily: FONTS.sans,
-                    fontSize: 14,
-                    color: COLORS.shadowGrey,
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M8 2v9M4 8l4 4 4-4M2 14h12" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Download
-                </div>
+                {/* Download button with animated border highlight */}
+                <AnimatedBorderHighlight frame={frame} startFrame={DOWNLOAD_HIGHLIGHT_START}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "10px 16px",
+                      backgroundColor: "transparent",
+                      boxShadow: `inset 0 0 0 1px ${COLORS.silver}`,
+                      fontFamily: FONTS.sans,
+                      fontSize: 14,
+                      color: COLORS.shadowGrey,
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M8 2v9M4 8l4 4 4-4M2 14h12" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Download
+                  </div>
+                </AnimatedBorderHighlight>
               </div>
             </div>
           )}
