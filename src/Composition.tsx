@@ -170,6 +170,17 @@ const DOWNLOAD_BORDER_COMPLETE = DOWNLOAD_HIGHLIGHT_START + 3 * DOWNLOAD_HIGHLIG
 const DOWNLOAD_PRESS_START = DOWNLOAD_BORDER_COMPLETE + DOWNLOAD_PRESS_DELAY;
 const DOWNLOAD_PRESS_DURATION = 8; // Frames for the press color flip
 
+// Final zoom into the download button (after press completes)
+const FINAL_ZOOM_DELAY = 12; // Frames after press completes before zoom starts
+const FINAL_ZOOM_START = DOWNLOAD_PRESS_START + DOWNLOAD_PRESS_DURATION + FINAL_ZOOM_DELAY;
+const FINAL_ZOOM_DURATION = 15; // Frames for the zoom animation
+const FINAL_ZOOM_SCALE = 50; // Scale large enough that button fills entire screen
+
+// Download button position relative to viewport center (for zoom origin)
+// Button is in the browser (offset down 130px), in the card body, on the right side
+const DOWNLOAD_BUTTON_OFFSET_X = 250; // Pixels right of center
+const DOWNLOAD_BUTTON_OFFSET_Y = 220; // Pixels below center
+
 // Subtitle text changes (synced with flow phases)
 const SUBTITLE_TEXTS = [
   "SEARCH FOR ANY PART",
@@ -2209,6 +2220,7 @@ export const MyComposition: React.FC = () => {
   // Background color transitions:
   // Phase 1: dark to ivory-mist during symbol zoom
   // Phase 2: ivory-mist to shadow-grey when browser window appears
+  // Phase 3: shadow-grey to black during final zoom
   const browserZoomProgress = interpolate(
     frame,
     [BROWSER_ZOOM_START, BROWSER_ZOOM_START + BROWSER_ZOOM_DURATION],
@@ -2216,20 +2228,35 @@ export const MyComposition: React.FC = () => {
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
+  // Final zoom into download button
+  const finalZoomProgress = interpolate(
+    frame,
+    [FINAL_ZOOM_START, FINAL_ZOOM_START + FINAL_ZOOM_DURATION],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+  const easedFinalZoom = Easing.inOut(Easing.cubic)(finalZoomProgress);
+  const finalZoomScale = interpolate(easedFinalZoom, [0, 1], [1, FINAL_ZOOM_SCALE]);
+
   // During symbol zoom: dark -> ivory-mist
   const phase1R = interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.r, COLOR_RGB.ivoryMist.r]);
   const phase1G = interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.g, COLOR_RGB.ivoryMist.g]);
   const phase1B = interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.b, COLOR_RGB.ivoryMist.b]);
 
   // During browser zoom: ivory-mist -> shadow-grey
+  const phase2R = interpolate(browserZoomProgress, [0, 1], [phase1R, COLOR_RGB.shadowGrey.r]);
+  const phase2G = interpolate(browserZoomProgress, [0, 1], [phase1G, COLOR_RGB.shadowGrey.g]);
+  const phase2B = interpolate(browserZoomProgress, [0, 1], [phase1B, COLOR_RGB.shadowGrey.b]);
+
+  // During final zoom: shadow-grey -> black
   const bgR = Math.round(
-    interpolate(browserZoomProgress, [0, 1], [phase1R, COLOR_RGB.shadowGrey.r]),
+    interpolate(easedFinalZoom, [0, 1], [phase2R, COLOR_RGB.black.r]),
   );
   const bgG = Math.round(
-    interpolate(browserZoomProgress, [0, 1], [phase1G, COLOR_RGB.shadowGrey.g]),
+    interpolate(easedFinalZoom, [0, 1], [phase2G, COLOR_RGB.black.g]),
   );
   const bgB = Math.round(
-    interpolate(browserZoomProgress, [0, 1], [phase1B, COLOR_RGB.shadowGrey.b]),
+    interpolate(easedFinalZoom, [0, 1], [phase2B, COLOR_RGB.black.b]),
   );
   const backgroundColor = `rgb(${bgR}, ${bgG}, ${bgB})`;
 
@@ -2369,29 +2396,45 @@ export const MyComposition: React.FC = () => {
       )}
 
 
-      {/* Browser window - zooms out to reveal the full interface */}
-      <BrowserWindow frame={frame} />
+      {/* Container for browser and headline - zooms into download button at end */}
+      <div
+        style={{
+          position: "absolute",
+          left: "50%",
+          top: "50%",
+          transform: `translate(-50%, -50%) scale(${finalZoomScale})`,
+          // Transform origin targets the download button center
+          transformOrigin: `calc(50% + ${DOWNLOAD_BUTTON_OFFSET_X}px) calc(50% + ${DOWNLOAD_BUTTON_OFFSET_Y}px)`,
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {/* Browser window - zooms out to reveal the full interface */}
+        <BrowserWindow frame={frame} />
 
-      {/* Headline text above browser */}
-      {frame >= HEADLINE_APPEAR_START && (
-        <div
-          style={{
-            position: "absolute",
-            top: `calc(50% + ${BROWSER_WINDOW.verticalOffset}px - ${BROWSER_WINDOW.height / 2 + 135}px)`,
-            left: "50%",
-            transform: "translateX(-50%)",
-            opacity: interpolate(
-              frame,
-              [HEADLINE_APPEAR_START, HEADLINE_APPEAR_START + HEADLINE_APPEAR_DURATION],
-              [0, 1],
-              { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-            ),
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
+        {/* Headline text above browser */}
+        {frame >= HEADLINE_APPEAR_START && (
+          <div
+            style={{
+              position: "absolute",
+              top: `calc(50% + ${BROWSER_WINDOW.verticalOffset}px - ${BROWSER_WINDOW.height / 2 + 135}px)`,
+              left: "50%",
+              transform: "translateX(-50%)",
+              opacity: interpolate(
+                frame,
+                [HEADLINE_APPEAR_START, HEADLINE_APPEAR_START + HEADLINE_APPEAR_DURATION],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+              ),
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
           <span
             style={{
               fontFamily: FONTS.sans,
@@ -2418,7 +2461,8 @@ export const MyComposition: React.FC = () => {
             )}
           </div>
         </div>
-      )}
+        )}
+      </div>
 
       {/* Opening text - each letter animates independently */}
       {textVisible && (
