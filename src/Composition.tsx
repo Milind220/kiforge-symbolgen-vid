@@ -132,6 +132,46 @@ const HEADLINE_APPEAR_DELAY = 12; // Frames after browser zoom starts
 const HEADLINE_APPEAR_START = BROWSER_ZOOM_START + HEADLINE_APPEAR_DELAY;
 const HEADLINE_APPEAR_DURATION = 12; // Frames to fade in
 
+// =============================================================================
+// SYMBOL GENERATION FLOW TIMING (after browser settles)
+// =============================================================================
+const FLOW_START_DELAY = 25; // Frames after browser zoom ends before typing starts
+const FLOW_START = BROWSER_ZOOM_START + BROWSER_ZOOM_DURATION + FLOW_START_DELAY;
+
+// Phase 1: Typing animation
+const PART_NUMBER = "AS3933-BQFT";
+const TYPING_SPEED = 0.5; // Characters typed per frame (higher = faster typing)
+const TYPING_DURATION = Math.ceil(PART_NUMBER.length / TYPING_SPEED);
+const TYPING_START = FLOW_START;
+const TYPING_END = TYPING_START + TYPING_DURATION;
+
+// Phase 2: Generating card (appears after typing, shows progress 5% → 100%)
+const GENERATING_APPEAR_DELAY = 15; // Frames after typing ends
+const GENERATING_START = TYPING_END + GENERATING_APPEAR_DELAY;
+const GENERATING_DURATION = 90; // Frames for progress bar to go 5% → 100%
+const GENERATING_END = GENERATING_START + GENERATING_DURATION;
+
+// Progress bar phases within generation
+const PROGRESS_START_PERCENT = 5;
+const PROGRESS_END_PERCENT = 100;
+// Message timing: "Fetching datasheet URL" for first 40%, then "Analyzing datasheet with AI"
+const MESSAGE_SWITCH_PROGRESS = 40;
+
+// Phase 3: Symbol complete card
+const COMPLETE_APPEAR_DELAY = 12; // Frames after generation ends
+const COMPLETE_START = GENERATING_END + COMPLETE_APPEAR_DELAY;
+
+// Subtitle text changes (synced with flow phases)
+const SUBTITLE_TEXTS = [
+  "Search for any part",
+  "wait 2 min or less",
+  "enjoy your symbol",
+] as const;
+// Subtitle changes at: generating start, complete start
+const SUBTITLE_PHASE_2_START = GENERATING_START; // "wait 2 min or less"
+const SUBTITLE_PHASE_3_START = COMPLETE_START; // "enjoy your symbol"
+const SUBTITLE_TRANSITION_DURATION = 10; // Frames to fade between subtitles
+
 // Second text timing ("What if there was a better way?")
 const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
 const SECOND_TEXT_START = PINS_SWING_START + SECOND_TEXT_DELAY; // Frame 70
@@ -1499,7 +1539,7 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
           <KiForgeLogoSVG size={LOGO_CORNER_SIZE} />
         </div>
 
-        {/* Search bar in center */}
+        {/* Flow content area */}
         <div
           style={{
             position: "absolute",
@@ -1511,76 +1551,408 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
             flexDirection: "column",
             alignItems: "center",
             gap: 12,
+            width: 520,
           }}
         >
-          {/* Search input container */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 24,
-              padding: "14px 20px",
-              backgroundColor: COLORS.eggshell,
-              minWidth: 520,
-            }}
-          >
-            {/* Terminal prompt */}
-            <span
+          {/* Phase 1 & 2: Search input (stays visible, shows typing then typed text) */}
+          {frame < COMPLETE_START && (
+            <>
+              {/* Search input container */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 24,
+                  padding: "14px 20px",
+                  backgroundColor: COLORS.eggshell,
+                  width: "100%",
+                  boxSizing: "border-box",
+                  boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
+                }}
+              >
+                {/* Terminal prompt */}
+                <span
+                  style={{
+                    fontFamily: FONTS.mono,
+                    fontSize: 18,
+                    color: COLORS.teal,
+                    userSelect: "none",
+                  }}
+                >
+                  {">"}
+                </span>
+
+                {/* Animated text or placeholder */}
+                <div style={{ position: "relative", flex: 1 }}>
+                  {frame < TYPING_START ? (
+                    // Before typing: show placeholder
+                    <span
+                      style={{
+                        fontFamily: FONTS.mono,
+                        fontSize: 18,
+                        color: COLORS.silver,
+                      }}
+                    >
+                      start typing to search, e.g. "74HC595"
+                    </span>
+                  ) : (
+                    // During/after typing: show typed characters
+                    <span
+                      style={{
+                        fontFamily: FONTS.mono,
+                        fontSize: 18,
+                        color: COLORS.shadowGrey,
+                      }}
+                    >
+                      {PART_NUMBER.slice(
+                        0,
+                        Math.min(
+                          PART_NUMBER.length,
+                          Math.floor((frame - TYPING_START) * TYPING_SPEED)
+                        )
+                      )}
+                      {/* Blinking cursor during typing */}
+                      {frame >= TYPING_START && frame < TYPING_END && (
+                        <span
+                          style={{
+                            color: COLORS.teal,
+                            opacity: Math.floor(frame / 8) % 2 === 0 ? 1 : 0,
+                          }}
+                        >
+                          ▌
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </div>
+
+                {/* Run button appears after typing completes */}
+                {frame >= TYPING_END && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "6px 12px",
+                      backgroundColor: COLORS.teal,
+                      fontFamily: FONTS.mono,
+                      fontSize: 13,
+                      color: COLORS.white,
+                      opacity: interpolate(
+                        frame,
+                        [TYPING_END, TYPING_END + 8],
+                        [0, 1],
+                        { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                      ),
+                    }}
+                  >
+                    {/* Play icon (triangle) */}
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                      <polygon points="0,0 10,5 0,10" />
+                    </svg>
+                    run
+                  </div>
+                )}
+              </div>
+
+              {/* Hint text - only before typing starts */}
+              {frame < TYPING_START && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 14,
+                    color: COLORS.silver,
+                    fontFamily: FONTS.sans,
+                  }}
+                >
+                  <span>press</span>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: 22,
+                      minWidth: 22,
+                      padding: "0 5px",
+                      backgroundColor: COLORS.eggshell,
+                      borderRadius: 4,
+                      fontFamily: FONTS.sans,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: COLORS.shadowGrey,
+                    }}
+                  >
+                    ↵
+                  </span>
+                  <span>to search</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Phase 2: Generating status card */}
+          {frame >= GENERATING_START && frame < COMPLETE_START && (
+            <div
               style={{
-                fontFamily: FONTS.mono,
-                fontSize: 18,
-                color: COLORS.teal,
-                userSelect: "none",
+                width: "100%",
+                marginTop: 24,
+                opacity: interpolate(
+                  frame,
+                  [GENERATING_START, GENERATING_START + 10],
+                  [0, 1],
+                  { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                ),
               }}
             >
-              {">"}
-            </span>
+              {/* Title */}
+              <div style={{ marginBottom: 16 }}>
+                <span
+                  style={{
+                    fontFamily: FONTS.sans,
+                    fontSize: 18,
+                    fontWeight: 500,
+                    color: COLORS.shadowGrey,
+                  }}
+                >
+                  Generating symbol...
+                </span>
+              </div>
 
-            {/* Placeholder text */}
-            <span
-              style={{
-                fontFamily: FONTS.mono,
-                fontSize: 18,
-                color: COLORS.silver,
-              }}
-            >
-              start typing to search, e.g. "74HC595"
-            </span>
-          </div>
+              {/* Terminal output */}
+              <div
+                style={{
+                  padding: 16,
+                  backgroundColor: COLORS.eggshell,
+                  fontFamily: FONTS.mono,
+                  fontSize: 14,
+                  boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
+                }}
+              >
+                {/* Initial line */}
+                <div style={{ color: COLORS.silver }}>
+                  <span style={{ color: COLORS.teal }}>{">"}</span>{" "}
+                  Processing <span style={{ color: COLORS.shadowGrey }}>{PART_NUMBER}</span>
+                </div>
 
-          {/* Hint text */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 14,
-              color: COLORS.silver,
-              fontFamily: FONTS.sans,
-            }}
-          >
-            <span>press</span>
-            {/* Keyboard key indicator */}
-            <span
+                {/* Status message - changes based on progress */}
+                {(() => {
+                  const progress = interpolate(
+                    frame,
+                    [GENERATING_START, GENERATING_END],
+                    [PROGRESS_START_PERCENT, PROGRESS_END_PERCENT],
+                    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                  );
+                  const message = progress < MESSAGE_SWITCH_PROGRESS
+                    ? "Fetching datasheet URL..."
+                    : "Analyzing datasheet with AI...";
+                  return (
+                    <div style={{ marginTop: 8, color: COLORS.silver }}>
+                      <span style={{ color: COLORS.teal }}>{">"}</span> {message}
+                    </div>
+                  );
+                })()}
+
+                {/* Blinking cursor */}
+                <div style={{ marginTop: 8 }}>
+                  <span
+                    style={{
+                      color: COLORS.teal,
+                      opacity: Math.floor(frame / 8) % 2 === 0 ? 1 : 0,
+                    }}
+                  >
+                    _
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ marginTop: 16 }}>
+                <div
+                  style={{
+                    height: 4,
+                    width: "100%",
+                    backgroundColor: "#e0e0e0",
+                    borderRadius: 2,
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      backgroundColor: COLORS.teal,
+                      width: `${interpolate(
+                        frame,
+                        [GENERATING_START, GENERATING_END],
+                        [PROGRESS_START_PERCENT, PROGRESS_END_PERCENT],
+                        { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                      )}%`,
+                      transition: "width 0.1s ease-out",
+                    }}
+                  />
+                </div>
+                <p
+                  style={{
+                    marginTop: 8,
+                    textAlign: "center",
+                    fontSize: 12,
+                    color: COLORS.silver,
+                    fontFamily: FONTS.sans,
+                  }}
+                >
+                  {Math.round(
+                    interpolate(
+                      frame,
+                      [GENERATING_START, GENERATING_END],
+                      [PROGRESS_START_PERCENT, PROGRESS_END_PERCENT],
+                      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                    )
+                  )}%
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Phase 3: Symbol complete card */}
+          {frame >= COMPLETE_START && (
+            <div
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                height: 22,
-                minWidth: 22,
-                padding: "0 5px",
+                width: "100%",
                 backgroundColor: COLORS.eggshell,
-                borderRadius: 4,
-                fontFamily: FONTS.sans,
-                fontSize: 13,
-                fontWeight: 500,
-                color: COLORS.shadowGrey,
+                boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
+                opacity: interpolate(
+                  frame,
+                  [COMPLETE_START, COMPLETE_START + 10],
+                  [0, 1],
+                  { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                ),
               }}
             >
-              ↵
-            </span>
-            <span>to search</span>
-          </div>
+              {/* Header */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "20px 24px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  {/* Success icon */}
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "rgba(0, 130, 130, 0.1)",
+                      boxShadow: "inset 0 0 0 1px rgba(0, 130, 130, 0.2)",
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                      <circle cx="10" cy="10" r="8" stroke={COLORS.teal} strokeWidth="1.5" />
+                      <path d="M6 10l3 3 5-6" stroke={COLORS.teal} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 500,
+                        letterSpacing: "0.25em",
+                        textTransform: "uppercase",
+                        color: COLORS.silver,
+                        marginBottom: 2,
+                      }}
+                    >
+                      Complete
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 18,
+                        fontWeight: 500,
+                        color: COLORS.shadowGrey,
+                        fontFamily: FONTS.sans,
+                      }}
+                    >
+                      Symbol generated
+                    </p>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", fontSize: 12 }}>
+                  <div
+                    style={{
+                      fontFamily: FONTS.mono,
+                      color: COLORS.shadowGrey,
+                    }}
+                  >
+                    {PART_NUMBER}.kicad_sym
+                  </div>
+                  <div style={{ color: COLORS.silver, marginTop: 2 }}>
+                    KiCad symbol file
+                  </div>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div
+                style={{
+                  borderTop: `1px solid rgba(0,0,0,0.06)`,
+                  padding: "20px 24px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <p
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 500,
+                      letterSpacing: "0.25em",
+                      textTransform: "uppercase",
+                      color: COLORS.silver,
+                      marginBottom: 4,
+                    }}
+                  >
+                    Part number
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 24,
+                      fontWeight: 500,
+                      fontFamily: FONTS.mono,
+                      color: COLORS.shadowGrey,
+                    }}
+                  >
+                    {PART_NUMBER}
+                  </p>
+                </div>
+                {/* Download button */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 16px",
+                    backgroundColor: "transparent",
+                    boxShadow: `inset 0 0 0 1px ${COLORS.silver}`,
+                    fontFamily: FONTS.sans,
+                    fontSize: 14,
+                    color: COLORS.shadowGrey,
+                  }}
+                >
+                  {/* Download icon */}
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M8 2v9M4 8l4 4 4-4M2 14h12" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Download
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
         </div>
@@ -1821,17 +2193,85 @@ export const MyComposition: React.FC = () => {
           >
             Get New Symbols Easily
           </span>
-          <span
-            style={{
-              fontFamily: FONTS.sans,
-              fontSize: 22,
-              fontWeight: 400,
-              color: COLORS.silver,
-              whiteSpace: "nowrap",
-            }}
-          >
-            symbols an engineer would love
-          </span>
+          {/* Subtitle - changes based on flow phase */}
+          <div style={{ position: "relative", height: 28 }}>
+            {/* Phase 1: "Search for any part" */}
+            <span
+              style={{
+                position: "absolute",
+                left: "50%",
+                transform: "translateX(-50%)",
+                fontFamily: FONTS.sans,
+                fontSize: 22,
+                fontWeight: 400,
+                color: COLORS.silver,
+                whiteSpace: "nowrap",
+                opacity: frame < SUBTITLE_PHASE_2_START
+                  ? 1
+                  : interpolate(
+                      frame,
+                      [SUBTITLE_PHASE_2_START, SUBTITLE_PHASE_2_START + SUBTITLE_TRANSITION_DURATION],
+                      [1, 0],
+                      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                    ),
+              }}
+            >
+              {SUBTITLE_TEXTS[0]}
+            </span>
+            {/* Phase 2: "wait 2 min or less" */}
+            <span
+              style={{
+                position: "absolute",
+                left: "50%",
+                transform: "translateX(-50%)",
+                fontFamily: FONTS.sans,
+                fontSize: 22,
+                fontWeight: 400,
+                color: COLORS.silver,
+                whiteSpace: "nowrap",
+                opacity: frame < SUBTITLE_PHASE_2_START
+                  ? 0
+                  : frame < SUBTITLE_PHASE_3_START
+                    ? interpolate(
+                        frame,
+                        [SUBTITLE_PHASE_2_START, SUBTITLE_PHASE_2_START + SUBTITLE_TRANSITION_DURATION],
+                        [0, 1],
+                        { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                      )
+                    : interpolate(
+                        frame,
+                        [SUBTITLE_PHASE_3_START, SUBTITLE_PHASE_3_START + SUBTITLE_TRANSITION_DURATION],
+                        [1, 0],
+                        { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                      ),
+              }}
+            >
+              {SUBTITLE_TEXTS[1]}
+            </span>
+            {/* Phase 3: "enjoy your symbol" */}
+            <span
+              style={{
+                position: "absolute",
+                left: "50%",
+                transform: "translateX(-50%)",
+                fontFamily: FONTS.sans,
+                fontSize: 22,
+                fontWeight: 400,
+                color: COLORS.silver,
+                whiteSpace: "nowrap",
+                opacity: frame < SUBTITLE_PHASE_3_START
+                  ? 0
+                  : interpolate(
+                      frame,
+                      [SUBTITLE_PHASE_3_START, SUBTITLE_PHASE_3_START + SUBTITLE_TRANSITION_DURATION],
+                      [0, 1],
+                      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                    ),
+              }}
+            >
+              {SUBTITLE_TEXTS[2]}
+            </span>
+          </div>
         </div>
       )}
 
