@@ -135,7 +135,7 @@ const HEADLINE_APPEAR_DURATION = 12; // Frames to fade in
 // =============================================================================
 // SYMBOL GENERATION FLOW TIMING (after browser settles)
 // =============================================================================
-const FLOW_START_DELAY = 25; // Frames after browser zoom ends before typing starts
+const FLOW_START_DELAY = 12; // Frames after browser zoom ends before typing starts
 const FLOW_START = BROWSER_ZOOM_START + BROWSER_ZOOM_DURATION + FLOW_START_DELAY;
 
 // Phase 1: Typing animation
