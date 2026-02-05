@@ -170,16 +170,21 @@ const DOWNLOAD_BORDER_COMPLETE = DOWNLOAD_HIGHLIGHT_START + 3 * DOWNLOAD_HIGHLIG
 const DOWNLOAD_PRESS_START = DOWNLOAD_BORDER_COMPLETE + DOWNLOAD_PRESS_DELAY;
 const DOWNLOAD_PRESS_DURATION = 8; // Frames for the press color flip
 
-// Final zoom into the download button (after press completes)
-const FINAL_ZOOM_DELAY = 12; // Frames after press completes before zoom starts
-const FINAL_ZOOM_START = DOWNLOAD_PRESS_START + DOWNLOAD_PRESS_DURATION + FINAL_ZOOM_DELAY;
-const FINAL_ZOOM_DURATION = 15; // Frames for the zoom animation
-const FINAL_ZOOM_SCALE = 50; // Scale large enough that button fills entire screen
+// Wave transition (single black circle emanating from download button center)
+const WAVE_TRANSITION_DELAY = 4; // Frames after press completes before wave starts
+const WAVE_TRANSITION_START = DOWNLOAD_PRESS_START + DOWNLOAD_PRESS_DURATION + WAVE_TRANSITION_DELAY;
+const WAVE_TRANSITION_DURATION = 18; // Frames for wave to cover full screen (fast)
 
-// Download button position relative to viewport center (for zoom origin)
-// Button is in the browser (offset down 130px), in the card body, on the right side
-const DOWNLOAD_BUTTON_OFFSET_X = 250; // Pixels right of center
-const DOWNLOAD_BUTTON_OFFSET_Y = 220; // Pixels below center
+// Download button center position (relative to viewport center)
+// Calculated from: browser layout + card layout + button position
+// Browser: centered with verticalOffset of 130px
+// Card: 520px wide, scaled 1.1, centered in 1100px content, with flowContentOffsetY
+// Button: right side of card body, with padding
+const DOWNLOAD_BUTTON_CENTER = {
+  x: 252, // Pixels right of viewport center
+  y: 218, // Pixels below viewport center (includes browser offset)
+} as const;
+
 
 // Subtitle text changes (synced with flow phases)
 const SUBTITLE_TEXTS = [
@@ -2098,6 +2103,56 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
 };
 
 // =============================================================================
+// WAVE TRANSITION COMPONENT
+// =============================================================================
+
+// Single black circle that rapidly expands from download button center to fill the screen
+const WaveTransition: React.FC<{ frame: number }> = ({ frame }) => {
+  const { width: compW, height: compH } = useVideoConfig();
+
+  // Don't render until wave transition starts
+  if (frame < WAVE_TRANSITION_START) return null;
+
+  // Button center in viewport coordinates
+  const centerX = compW / 2 + DOWNLOAD_BUTTON_CENTER.x;
+  const centerY = compH / 2 + DOWNLOAD_BUTTON_CENTER.y;
+
+  // Calculate max radius needed to cover entire screen from button center
+  // Distance to furthest corner
+  const maxRadius = Math.sqrt(
+    Math.max(centerX, compW - centerX) ** 2 + Math.max(centerY, compH - centerY) ** 2
+  ) + 50; // Small buffer
+
+  // Wave expansion progress
+  const progress = interpolate(
+    frame,
+    [WAVE_TRANSITION_START, WAVE_TRANSITION_START + WAVE_TRANSITION_DURATION],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  // Ease out for rapid expansion that slows at the end
+  const easedProgress = Easing.out(Easing.quad)(progress);
+  const radius = easedProgress * maxRadius;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: centerX,
+        top: centerY,
+        width: radius * 2,
+        height: radius * 2,
+        borderRadius: "50%",
+        backgroundColor: COLORS.black,
+        transform: "translate(-50%, -50%)",
+        pointerEvents: "none",
+      }}
+    />
+  );
+};
+
+// =============================================================================
 // MAIN COMPOSITION
 // =============================================================================
 
@@ -2220,7 +2275,7 @@ export const MyComposition: React.FC = () => {
   // Background color transitions:
   // Phase 1: dark to ivory-mist during symbol zoom
   // Phase 2: ivory-mist to shadow-grey when browser window appears
-  // Phase 3: shadow-grey to black during final zoom
+  // (Wave transition handles the final flip to black)
   const browserZoomProgress = interpolate(
     frame,
     [BROWSER_ZOOM_START, BROWSER_ZOOM_START + BROWSER_ZOOM_DURATION],
@@ -2228,36 +2283,15 @@ export const MyComposition: React.FC = () => {
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
-  // Final zoom into download button
-  const finalZoomProgress = interpolate(
-    frame,
-    [FINAL_ZOOM_START, FINAL_ZOOM_START + FINAL_ZOOM_DURATION],
-    [0, 1],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
-  const easedFinalZoom = Easing.inOut(Easing.cubic)(finalZoomProgress);
-  const finalZoomScale = interpolate(easedFinalZoom, [0, 1], [1, FINAL_ZOOM_SCALE]);
-
   // During symbol zoom: dark -> ivory-mist
   const phase1R = interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.r, COLOR_RGB.ivoryMist.r]);
   const phase1G = interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.g, COLOR_RGB.ivoryMist.g]);
   const phase1B = interpolate(easedZoom, [0, 1], [COLOR_RGB.darkBg.b, COLOR_RGB.ivoryMist.b]);
 
-  // During browser zoom: ivory-mist -> shadow-grey
-  const phase2R = interpolate(browserZoomProgress, [0, 1], [phase1R, COLOR_RGB.shadowGrey.r]);
-  const phase2G = interpolate(browserZoomProgress, [0, 1], [phase1G, COLOR_RGB.shadowGrey.g]);
-  const phase2B = interpolate(browserZoomProgress, [0, 1], [phase1B, COLOR_RGB.shadowGrey.b]);
-
-  // During final zoom: shadow-grey -> black
-  const bgR = Math.round(
-    interpolate(easedFinalZoom, [0, 1], [phase2R, COLOR_RGB.black.r]),
-  );
-  const bgG = Math.round(
-    interpolate(easedFinalZoom, [0, 1], [phase2G, COLOR_RGB.black.g]),
-  );
-  const bgB = Math.round(
-    interpolate(easedFinalZoom, [0, 1], [phase2B, COLOR_RGB.black.b]),
-  );
+  // During browser zoom: ivory-mist -> shadow-grey (final background state)
+  const bgR = Math.round(interpolate(browserZoomProgress, [0, 1], [phase1R, COLOR_RGB.shadowGrey.r]));
+  const bgG = Math.round(interpolate(browserZoomProgress, [0, 1], [phase1G, COLOR_RGB.shadowGrey.g]));
+  const bgB = Math.round(interpolate(browserZoomProgress, [0, 1], [phase1B, COLOR_RGB.shadowGrey.b]));
   const backgroundColor = `rgb(${bgR}, ${bgG}, ${bgB})`;
 
   // Hide grid and text during zoom
@@ -2396,15 +2430,13 @@ export const MyComposition: React.FC = () => {
       )}
 
 
-      {/* Container for browser and headline - zooms into download button at end */}
+      {/* Container for browser and headline */}
       <div
         style={{
           position: "absolute",
           left: "50%",
           top: "50%",
-          transform: `translate(-50%, -50%) scale(${finalZoomScale})`,
-          // Transform origin targets the download button center
-          transformOrigin: `calc(50% + ${DOWNLOAD_BUTTON_OFFSET_X}px) calc(50% + ${DOWNLOAD_BUTTON_OFFSET_Y}px)`,
+          transform: "translate(-50%, -50%)",
           width: "100%",
           height: "100%",
           display: "flex",
@@ -2527,6 +2559,9 @@ export const MyComposition: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* Wave transition - expanding circles for theme flip effect */}
+      <WaveTransition frame={frame} />
     </AbsoluteFill>
   );
 };
