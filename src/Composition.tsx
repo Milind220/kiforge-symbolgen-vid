@@ -185,6 +185,15 @@ const DOWNLOAD_BUTTON_CENTER = {
   y: 218, // Pixels below viewport center (includes browser offset)
 } as const;
 
+// Endcard timing (logo + cycling taglines on black screen)
+const ENDCARD_START = WAVE_TRANSITION_START + WAVE_TRANSITION_DURATION; // When screen is fully black
+const ENDCARD_LOGO_SIZE = 64; // Logo size on endcard
+const ENDCARD_TAGLINES = [
+  "Never draw symbols again.",
+  "The AI layer for KiCAD",
+  "more coming soon...",
+] as const;
+const ENDCARD_TAGLINE_DURATION = 28; // Frames each tagline is shown (~0.9 sec)
 
 // Subtitle text changes (synced with flow phases)
 const SUBTITLE_TEXTS = [
@@ -2153,6 +2162,75 @@ const WaveTransition: React.FC<{ frame: number }> = ({ frame }) => {
 };
 
 // =============================================================================
+// ENDCARD COMPONENT
+// =============================================================================
+
+// KiForge logo + title with cycling taglines on black background
+const Endcard: React.FC<{ frame: number }> = ({ frame }) => {
+  // Don't render until endcard starts
+  if (frame < ENDCARD_START) return null;
+
+  // Calculate which tagline to show (cycles through without fade)
+  const framesSinceStart = frame - ENDCARD_START;
+  const taglineIndex = Math.min(
+    Math.floor(framesSinceStart / ENDCARD_TAGLINE_DURATION),
+    ENDCARD_TAGLINES.length - 1
+  );
+  const currentTagline = ENDCARD_TAGLINES[taglineIndex];
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 16,
+        pointerEvents: "none",
+      }}
+    >
+      {/* Logo + Title row */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+        }}
+      >
+        <KiForgeLogoSVG size={ENDCARD_LOGO_SIZE} />
+        <span
+          style={{
+            fontFamily: FONTS.sans,
+            fontSize: 48,
+            fontWeight: 500,
+            color: COLORS.white,
+          }}
+        >
+          KiForge.io
+        </span>
+      </div>
+
+      {/* Cycling tagline */}
+      <span
+        style={{
+          fontFamily: FONTS.sans,
+          fontSize: 24,
+          fontWeight: 300,
+          color: COLORS.silver,
+        }}
+      >
+        {currentTagline}
+      </span>
+    </div>
+  );
+};
+
+// =============================================================================
 // MAIN COMPOSITION
 // =============================================================================
 
@@ -2562,6 +2640,9 @@ export const MyComposition: React.FC = () => {
 
       {/* Wave transition - expanding circles for theme flip effect */}
       <WaveTransition frame={frame} />
+
+      {/* Endcard - logo and cycling taglines on black */}
+      <Endcard frame={frame} />
     </AbsoluteFill>
   );
 };
