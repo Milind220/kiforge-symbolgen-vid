@@ -92,20 +92,12 @@ const ZOOM_START = CLICK_SPARK_START + CLICK_SPARK_DURATION + ZOOM_DELAY;
 const ZOOM_DURATION = 10; // Frames for zoom animation
 const ZOOM_SCALE = 8; // How much to scale up (fills screen with symbol interior)
 
-// Logo zoom animation - appears after main zoom, grows from tiny dot
-const LOGO_ZOOM_DELAY = 0; // Frames after main zoom completes
-const LOGO_ZOOM_START = ZOOM_START + ZOOM_DURATION + LOGO_ZOOM_DELAY;
-const LOGO_ZOOM_DURATION = 12; // Frames for logo to zoom in
-const LOGO_INITIAL_SCALE = 0.01; // Start as tiny dot
-const LOGO_FINAL_SIZE = 380; // Final width in pixels (similar to symbolFrame's 240)
-
 // Browser window zoom-out animation - reveals the full interface
-// Starts exactly when logo zoom ends for seamless transition
-const BROWSER_ZOOM_START = LOGO_ZOOM_START + LOGO_ZOOM_DURATION; // No delay
+// Starts directly after symbol zoom (no logo transition)
+const BROWSER_ZOOM_START = ZOOM_START + ZOOM_DURATION; // Directly after zoom
 const BROWSER_ZOOM_DURATION = 15; // Frames for zoom-out effect
-// Calculate initial scale so logo (at 48px) appears at same size as standalone (380px)
-const LOGO_CORNER_SIZE = 48; // Final logo size in corner
-const BROWSER_INITIAL_SCALE = LOGO_FINAL_SIZE / LOGO_CORNER_SIZE; // ~7.92
+const LOGO_CORNER_SIZE = 48; // Logo size in corner
+const BROWSER_INITIAL_SCALE = 8; // Start zoomed in (similar to ZOOM_SCALE)
 const BROWSER_FINAL_SCALE = 1; // End at normal size
 
 // Browser window dimensions
@@ -152,7 +144,7 @@ const SEARCH_EXIT_DURATION = 10; // Frames for search bar to fade/slide out
 
 // Phase 2: Generating card (appears as search exits, shows progress 5% → 100%)
 const GENERATING_START = SEARCH_EXIT_START; // Generating fades in as search exits
-const GENERATING_DURATION = 90; // Frames for progress bar to go 5% → 100%
+const GENERATING_DURATION = 30; // Frames for progress bar to go 5% → 100%
 const GENERATING_END = GENERATING_START + GENERATING_DURATION;
 
 // Progress bar phases within generation
@@ -1275,57 +1267,6 @@ const KiForgeLogoSVG: React.FC<{ size: number }> = ({ size }) => (
 );
 
 // =============================================================================
-// STANDALONE LOGO (for initial zoom-in animation)
-// =============================================================================
-
-const StandaloneLogo: React.FC<{ frame: number }> = ({ frame }) => {
-  const { fps } = useVideoConfig();
-
-  // Spring animation for the zoom-in effect
-  const logoSpring = spring({
-    fps,
-    frame: frame - LOGO_ZOOM_START,
-    config: {
-      damping: 15,
-      mass: 1,
-      stiffness: 120,
-      overshootClamping: false,
-    },
-    durationInFrames: LOGO_ZOOM_DURATION,
-  });
-
-  // Don't render before animation starts or after browser window appears
-  if (frame < LOGO_ZOOM_START || frame >= BROWSER_ZOOM_START) return null;
-
-  const scale = interpolate(logoSpring, [0, 1], [LOGO_INITIAL_SCALE, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const displaySize = LOGO_FINAL_SIZE * scale;
-
-  const opacity = interpolate(
-    frame,
-    [LOGO_ZOOM_START, LOGO_ZOOM_START + 3],
-    [0, 1],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
-
-  return (
-    <div
-      style={{
-        position: "absolute",
-        left: "50%",
-        top: "50%",
-        transform: "translate(-50%, -50%)",
-        opacity,
-      }}
-    >
-      <KiForgeLogoSVG size={displaySize} />
-    </div>
-  );
-};
-
-// =============================================================================
 // BROWSER WINDOW COMPONENT
 // =============================================================================
 
@@ -1390,23 +1331,12 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
   // Animate tilt from 0 to final value (seamless transition with zoom)
   const currentTilt = interpolate(zoomProgress, [0, 1], [0, tiltDegrees]);
 
-  // Logo position animation: starts at content-center, moves to corner
-  // Content center in browser coords (from top-left of content area)
-  const contentCenterX = width / 2;
-  const contentCenterY = contentHeight / 2;
-  const logoStartY = contentCenterY - titleBarHeight / 2;
-  // Corner position
-  const cornerX = LOGO_CORNER_PADDING + LOGO_CORNER_SIZE / 2;
-  const cornerY = LOGO_CORNER_PADDING + LOGO_CORNER_SIZE / 2;
-  // Interpolate logo position
-  const logoX = interpolate(zoomProgress, [0, 1], [contentCenterX, cornerX]);
-  const logoY = interpolate(zoomProgress, [0, 1], [logoStartY, cornerY]);
+  // Logo position - static in corner
+  const logoX = LOGO_CORNER_PADDING + LOGO_CORNER_SIZE / 2;
+  const logoY = LOGO_CORNER_PADDING + LOGO_CORNER_SIZE / 2;
 
-  // Transform origin: content-center (so logo stays at screen center during zoom)
-  // Content center from browser top-left: (width/2, titleBarHeight + contentHeight/2)
-  const originX = width / 2;
-  const originY = titleBarHeight + contentHeight / 2;
-  const transformOriginPercent = `${(originX / width) * 100}% ${(originY / height) * 100}%`;
+  // Transform origin: center of browser for zoom
+  const transformOriginPercent = "50% 50%";
 
   // Search bar visibility
   const showSearchBar = frame >= SEARCH_BAR_APPEAR_START;
@@ -2167,8 +2097,8 @@ export const MyComposition: React.FC = () => {
   const showGrid = frame < ZOOM_START;
   const showSecondText = frame >= SECOND_TEXT_START && frame < ZOOM_START;
 
-  // Hide the zoomed symbol frame when logo starts appearing
-  const showSymbolFrame = frame < LOGO_ZOOM_START;
+  // Hide the zoomed symbol frame when browser zoom starts
+  const showSymbolFrame = frame < BROWSER_ZOOM_START;
 
   const renderSubtitle = (
     text: string,
@@ -2298,8 +2228,6 @@ export const MyComposition: React.FC = () => {
         </div>
       )}
 
-      {/* Standalone logo - zooms in from tiny dot, visible until browser window appears */}
-      <StandaloneLogo frame={frame} />
 
       {/* Browser window - zooms out to reveal the full interface */}
       <BrowserWindow frame={frame} />
