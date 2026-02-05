@@ -89,13 +89,13 @@ const CLICK_SPARK_CONFIG = {
 // Big zoom animation - zooms into symbol, swaps colors
 const ZOOM_DELAY = 8; // Frames after sparks before zoom starts
 const ZOOM_START = CLICK_SPARK_START + CLICK_SPARK_DURATION + ZOOM_DELAY;
-const ZOOM_DURATION = 18; // Frames for zoom animation
-const ZOOM_SCALE = 15; // How much to scale up (fills screen with symbol interior)
+const ZOOM_DURATION = 10; // Frames for zoom animation
+const ZOOM_SCALE = 8; // How much to scale up (fills screen with symbol interior)
 
 // Logo zoom animation - appears after main zoom, grows from tiny dot
 const LOGO_ZOOM_DELAY = 0; // Frames after main zoom completes
 const LOGO_ZOOM_START = ZOOM_START + ZOOM_DURATION + LOGO_ZOOM_DELAY;
-const LOGO_ZOOM_DURATION = 20; // Frames for logo to zoom in
+const LOGO_ZOOM_DURATION = 15; // Frames for logo to zoom in
 const LOGO_INITIAL_SCALE = 0.01; // Start as tiny dot
 const LOGO_FINAL_SIZE = 380; // Final width in pixels (similar to symbolFrame's 240)
 
@@ -145,9 +145,13 @@ const TYPING_DURATION = Math.ceil(PART_NUMBER.length / TYPING_SPEED);
 const TYPING_START = FLOW_START;
 const TYPING_END = TYPING_START + TYPING_DURATION;
 
-// Phase 2: Generating card (appears after typing, shows progress 5% → 100%)
-const GENERATING_APPEAR_DELAY = 15; // Frames after typing ends
-const GENERATING_START = TYPING_END + GENERATING_APPEAR_DELAY;
+// Phase 1.5: Search submission (run button visible, then search bar exits)
+const RUN_BUTTON_VISIBLE_DURATION = 12; // Frames the run button is visible before "click"
+const SEARCH_EXIT_START = TYPING_END + RUN_BUTTON_VISIBLE_DURATION; // When search bar starts exiting
+const SEARCH_EXIT_DURATION = 10; // Frames for search bar to fade/slide out
+
+// Phase 2: Generating card (appears as search exits, shows progress 5% → 100%)
+const GENERATING_START = SEARCH_EXIT_START; // Generating fades in as search exits
 const GENERATING_DURATION = 90; // Frames for progress bar to go 5% → 100%
 const GENERATING_END = GENERATING_START + GENERATING_DURATION;
 
@@ -1276,7 +1280,7 @@ const StandaloneLogo: React.FC<{ frame: number }> = ({ frame }) => {
     fps,
     frame: frame - LOGO_ZOOM_START,
     config: {
-      damping: 10,
+      damping: 15,
       mass: 1,
       stiffness: 120,
       overshootClamping: false,
@@ -1551,23 +1555,46 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
           <KiForgeLogoSVG size={LOGO_CORNER_SIZE} />
         </div>
 
-        {/* Flow content area */}
+        {/* Flow content area - centered in browser content */}
         <div
           style={{
-            transform: `scale(${searchBarScale}) translateZ(0px)`,
-            opacity: searchBarOpacity,
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+            width: 520,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 12,
-            width: 520,
-            transformStyle: "preserve-3d",
-            backfaceVisibility: "hidden",
           }}
         >
-          {/* Phase 1 & 2: Search input (stays visible, shows typing then typed text) */}
-          {frame < COMPLETE_START && (
-            <>
+          {/* Phase 1: Search input (visible until search exits) */}
+          {frame < SEARCH_EXIT_START + SEARCH_EXIT_DURATION && (
+            <div
+              style={{
+                width: "100%",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 12,
+                opacity: frame < SEARCH_EXIT_START
+                  ? searchBarOpacity
+                  : interpolate(
+                      frame,
+                      [SEARCH_EXIT_START, SEARCH_EXIT_START + SEARCH_EXIT_DURATION],
+                      [1, 0],
+                      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                    ),
+                transform: frame < SEARCH_EXIT_START
+                  ? `scale(${searchBarScale})`
+                  : `scale(${searchBarScale}) translateY(${interpolate(
+                      frame,
+                      [SEARCH_EXIT_START, SEARCH_EXIT_START + SEARCH_EXIT_DURATION],
+                      [0, -20],
+                      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                    )}px)`,
+              }}
+            >
               {/* Search input container */}
               <div
                 style={{
@@ -1596,7 +1623,6 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                 {/* Animated text or placeholder */}
                 <div style={{ position: "relative", flex: 1 }}>
                   {frame < TYPING_START ? (
-                    // Before typing: show placeholder
                     <span
                       style={{
                         fontFamily: FONTS.mono,
@@ -1607,7 +1633,6 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                       start typing to search, e.g. "74HC595"
                     </span>
                   ) : (
-                    // During/after typing: show typed characters
                     <span
                       style={{
                         fontFamily: FONTS.mono,
@@ -1622,7 +1647,6 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                           Math.floor((frame - TYPING_START) * TYPING_SPEED)
                         )
                       )}
-                      {/* Blinking cursor during typing */}
                       {frame >= TYPING_START && frame < TYPING_END && (
                         <span
                           style={{
@@ -1657,7 +1681,6 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                       ),
                     }}
                   >
-                    {/* Play icon (triangle) */}
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
                       <polygon points="0,0 10,5 0,10" />
                     </svg>
@@ -1700,40 +1723,41 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                   <span>to search</span>
                 </div>
               )}
-            </>
+            </div>
           )}
 
-          {/* Phase 2: Generating status card */}
+          {/* Phase 2: Generating status card (centered, like KiForge web) */}
           {frame >= GENERATING_START && frame < COMPLETE_START && (
             <div
               style={{
                 width: "100%",
-                marginTop: 24,
                 opacity: interpolate(
                   frame,
-                  [GENERATING_START, GENERATING_START + 10],
+                  [GENERATING_START, GENERATING_START + SEARCH_EXIT_DURATION],
                   [0, 1],
                   { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
                 ),
               }}
             >
               {/* Title */}
-              <div style={{ marginBottom: 16 }}>
-                <span
+              <div style={{ marginBottom: 24 }}>
+                <h2
                   style={{
                     fontFamily: FONTS.sans,
                     fontSize: 18,
                     fontWeight: 500,
                     color: COLORS.shadowGrey,
+                    margin: 0,
                   }}
                 >
                   Generating symbol...
-                </span>
+                </h2>
               </div>
 
-              {/* Terminal output */}
+              {/* Terminal output - matches KiForge web styling */}
               <div
                 style={{
+                  minHeight: 140,
                   padding: 16,
                   backgroundColor: COLORS.eggshell,
                   fontFamily: FONTS.mono,
@@ -1747,7 +1771,7 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                   Processing <span style={{ color: COLORS.shadowGrey }}>{PART_NUMBER}</span>
                 </div>
 
-                {/* Status message - changes based on progress */}
+                {/* Status messages - appear sequentially */}
                 {(() => {
                   const progress = interpolate(
                     frame,
@@ -1755,13 +1779,20 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                     [PROGRESS_START_PERCENT, PROGRESS_END_PERCENT],
                     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
                   );
-                  const message = progress < MESSAGE_SWITCH_PROGRESS
-                    ? "Fetching datasheet URL..."
-                    : "Analyzing datasheet with AI...";
                   return (
-                    <div style={{ marginTop: 8, color: COLORS.silver }}>
-                      <span style={{ color: COLORS.teal }}>{">"}</span> {message}
-                    </div>
+                    <>
+                      {/* First message appears immediately */}
+                      <div style={{ marginTop: 8, color: COLORS.silver }}>
+                        <span style={{ color: COLORS.teal }}>{">"}</span> Fetching datasheet URL...
+                      </div>
+
+                      {/* Second message appears after progress passes threshold */}
+                      {progress >= MESSAGE_SWITCH_PROGRESS && (
+                        <div style={{ marginTop: 8, color: COLORS.silver }}>
+                          <span style={{ color: COLORS.teal }}>{">"}</span> Analyzing datasheet with AI...
+                        </div>
+                      )}
+                    </>
                   );
                 })()}
 
@@ -1784,8 +1815,8 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                   style={{
                     height: 4,
                     width: "100%",
-                    backgroundColor: "#e0e0e0",
-                    borderRadius: 2,
+                    backgroundColor: COLORS.eggshell,
+                    borderRadius: 9999,
                     overflow: "hidden",
                   }}
                 >
@@ -1799,7 +1830,6 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                         [PROGRESS_START_PERCENT, PROGRESS_END_PERCENT],
                         { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
                       )}%`,
-                      transition: "width 0.1s ease-out",
                     }}
                   />
                 </div>
@@ -1910,7 +1940,7 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
               {/* Body */}
               <div
                 style={{
-                  borderTop: `1px solid rgba(0,0,0,0.06)`,
+                  borderTop: "1px solid rgba(0,0,0,0.06)",
                   padding: "20px 24px",
                   display: "flex",
                   alignItems: "center",
@@ -1955,7 +1985,6 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                     color: COLORS.shadowGrey,
                   }}
                 >
-                  {/* Download icon */}
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M8 2v9M4 8l4 4 4-4M2 14h12" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
