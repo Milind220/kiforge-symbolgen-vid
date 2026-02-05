@@ -178,6 +178,7 @@ const SUBTITLE_TRANSITION_DURATION = 10; // Frames to fade between subtitles
 
 // Flow card sizing
 const FLOW_CARD_SCALE = 1.1; // 10% bigger
+const FLOW_CONTENT_Y_OFFSET = -0.1; // Move content up 10% of content height
 
 // Second text timing ("What if there was a better way?")
 const SECOND_TEXT_DELAY = 2; // Frames after pins start swinging
@@ -1379,6 +1380,7 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
 
   // Content area dimensions
   const contentHeight = height - titleBarHeight;
+  const flowContentOffsetY = contentHeight * FLOW_CONTENT_Y_OFFSET;
 
   // Animate vertical offset from 0 to final value (seamless transition)
   const currentVerticalOffset = interpolate(zoomProgress, [0, 1], [0, verticalOffset]);
@@ -1567,7 +1569,7 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
           style={{
             position: "absolute",
             left: "50%",
-            top: "50%",
+            top: `calc(50% + ${flowContentOffsetY}px)`,
             transform: "translate(-50%, -50%)",
             width: 520,
             display: "flex",
