@@ -164,6 +164,12 @@ const DOWNLOAD_HIGHLIGHT_DURATION = 20; // Frames for each border segment to ani
 const DOWNLOAD_HIGHLIGHT_STAGGER = 5; // Frames between each border segment starting
 const DOWNLOAD_HIGHLIGHT_BORDER_WIDTH = 3; // Width of the animated border
 
+// Download button press animation (after border completes, button "clicks")
+const DOWNLOAD_PRESS_DELAY = 8; // Frames after border completes before press
+const DOWNLOAD_BORDER_COMPLETE = DOWNLOAD_HIGHLIGHT_START + 3 * DOWNLOAD_HIGHLIGHT_STAGGER + DOWNLOAD_HIGHLIGHT_DURATION;
+const DOWNLOAD_PRESS_START = DOWNLOAD_BORDER_COMPLETE + DOWNLOAD_PRESS_DELAY;
+const DOWNLOAD_PRESS_DURATION = 8; // Frames for the press color flip
+
 // Subtitle text changes (synced with flow phases)
 const SUBTITLE_TEXTS = [
   "SEARCH FOR ANY PART",
@@ -1261,11 +1267,13 @@ const MouseCursorWithPin: React.FC<{
 // Animated border that traces around an element (like a button)
 // 4 segments animate in sequence: top (left→right), right (top→bottom),
 // bottom (right→left), left (bottom→top)
+// After border completes, the button "presses" and colors flip
 const AnimatedBorderHighlight: React.FC<{
   frame: number;
   startFrame: number;
   children: React.ReactNode;
-}> = ({ frame, startFrame, children }) => {
+  pressProgress: number; // 0 = not pressed, 1 = fully pressed
+}> = ({ frame, startFrame, children, pressProgress }) => {
   // Calculate progress for each border segment
   const getSegmentProgress = (segmentIndex: number): number => {
     const segmentStart = startFrame + segmentIndex * DOWNLOAD_HIGHLIGHT_STAGGER;
@@ -1287,6 +1295,12 @@ const AnimatedBorderHighlight: React.FC<{
   // Don't render border until animation starts
   const showBorder = frame >= startFrame;
 
+  // Interpolate border color from black to shadowGrey based on press progress
+  const borderR = Math.round(interpolate(pressProgress, [0, 1], [COLOR_RGB.black.r, COLOR_RGB.shadowGrey.r]));
+  const borderG = Math.round(interpolate(pressProgress, [0, 1], [COLOR_RGB.black.g, COLOR_RGB.shadowGrey.g]));
+  const borderB = Math.round(interpolate(pressProgress, [0, 1], [COLOR_RGB.black.b, COLOR_RGB.shadowGrey.b]));
+  const borderColor = `rgb(${borderR}, ${borderG}, ${borderB})`;
+
   return (
     <div style={{ position: "relative", overflow: "visible" }}>
       {children}
@@ -1296,11 +1310,11 @@ const AnimatedBorderHighlight: React.FC<{
           <div
             style={{
               position: "absolute",
-              top: -DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
+              top: 0,
               left: 0,
               width: `${topProgress * 100}%`,
               height: DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
-              backgroundColor: COLORS.black,
+              backgroundColor: borderColor,
             }}
           />
           {/* Right border - animates top to bottom */}
@@ -1308,21 +1322,21 @@ const AnimatedBorderHighlight: React.FC<{
             style={{
               position: "absolute",
               top: 0,
-              right: -DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
+              right: 0,
               width: DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
               height: `${rightProgress * 100}%`,
-              backgroundColor: COLORS.black,
+              backgroundColor: borderColor,
             }}
           />
           {/* Bottom border - animates right to left */}
           <div
             style={{
               position: "absolute",
-              bottom: -DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
+              bottom: 0,
               right: 0,
               width: `${bottomProgress * 100}%`,
               height: DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
-              backgroundColor: COLORS.black,
+              backgroundColor: borderColor,
             }}
           />
           {/* Left border - animates bottom to top */}
@@ -1330,10 +1344,10 @@ const AnimatedBorderHighlight: React.FC<{
             style={{
               position: "absolute",
               bottom: 0,
-              left: -DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
+              left: 0,
               width: DOWNLOAD_HIGHLIGHT_BORDER_WIDTH,
               height: `${leftProgress * 100}%`,
-              backgroundColor: COLORS.black,
+              backgroundColor: borderColor,
             }}
           />
         </>
@@ -2012,26 +2026,55 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
                   </p>
                 </div>
                 {/* Download button with animated border highlight */}
-                <AnimatedBorderHighlight frame={frame} startFrame={DOWNLOAD_HIGHLIGHT_START}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      boxShadow: `inset 0 0 0 1px ${COLORS.silver}`,
-                      fontFamily: FONTS.sans,
-                      fontSize: 14,
-                      color: COLORS.shadowGrey,
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M8 2v9M4 8l4 4 4-4M2 14h12" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    Download
-                  </div>
-                </AnimatedBorderHighlight>
+                {(() => {
+                  // Calculate press progress (0 = not pressed, 1 = fully pressed)
+                  const pressProgress = interpolate(
+                    frame,
+                    [DOWNLOAD_PRESS_START, DOWNLOAD_PRESS_START + DOWNLOAD_PRESS_DURATION],
+                    [0, 1],
+                    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+                  );
+                  const easedPress = Easing.out(Easing.cubic)(pressProgress);
+
+                  // Interpolate text/icon color from shadowGrey to eggshell
+                  const textR = Math.round(interpolate(easedPress, [0, 1], [COLOR_RGB.shadowGrey.r, COLOR_RGB.eggshell.r]));
+                  const textG = Math.round(interpolate(easedPress, [0, 1], [COLOR_RGB.shadowGrey.g, COLOR_RGB.eggshell.g]));
+                  const textB = Math.round(interpolate(easedPress, [0, 1], [COLOR_RGB.shadowGrey.b, COLOR_RGB.eggshell.b]));
+                  const textColor = `rgb(${textR}, ${textG}, ${textB})`;
+
+                  // Interpolate background color from transparent (eggshell) to black
+                  const bgR = Math.round(interpolate(easedPress, [0, 1], [COLOR_RGB.eggshell.r, COLOR_RGB.black.r]));
+                  const bgG = Math.round(interpolate(easedPress, [0, 1], [COLOR_RGB.eggshell.g, COLOR_RGB.black.g]));
+                  const bgB = Math.round(interpolate(easedPress, [0, 1], [COLOR_RGB.eggshell.b, COLOR_RGB.black.b]));
+                  const bgColor = `rgb(${bgR}, ${bgG}, ${bgB})`;
+
+                  return (
+                    <AnimatedBorderHighlight
+                      frame={frame}
+                      startFrame={DOWNLOAD_HIGHLIGHT_START}
+                      pressProgress={easedPress}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "10px 16px",
+                          backgroundColor: bgColor,
+                          boxShadow: `inset 0 0 0 1px ${COLORS.silver}`,
+                          fontFamily: FONTS.sans,
+                          fontSize: 14,
+                          color: textColor,
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={textColor} strokeWidth="1.5">
+                          <path d="M8 2v9M4 8l4 4 4-4M2 14h12" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        Download
+                      </div>
+                    </AnimatedBorderHighlight>
+                  );
+                })()}
               </div>
             </div>
           )}
