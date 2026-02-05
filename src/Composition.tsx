@@ -115,7 +115,7 @@ const BROWSER_WINDOW = {
   titleBarHeight: 52, // Height of title bar with traffic lights + URL
   borderRadius: 12, // Corner radius for the window
   verticalOffset: 130, // Pixels to lower the screen (positive = down)
-  tiltDegrees: 4, // 3D tilt: positive = top leans back (appears farther)
+  tiltDegrees: 10, // 3D tilt: positive = top leans back (appears farther)
   shadow: "0 0 25px 5px rgba(253, 246, 227, 0.05), 0 0 42px 10px rgba(253, 246, 227, 0.06), 0 0 76px 21px rgba(253, 246, 227, 0.04), 0 0 119px 38px rgba(253, 246, 227, 0.024)", // Screen glow halo (4-layer blend, tight)
 } as const;
 
@@ -1419,6 +1419,8 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
         height,
         perspective: "2000px",
         perspectiveOrigin: "center center",
+        transformStyle: "preserve-3d",
+        backfaceVisibility: "hidden",
       }}
     >
       {/* 3D tilt wrapper: ensures symmetric perspective on both edges */}
@@ -1444,6 +1446,7 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
             display: "flex",
             flexDirection: "column",
             backfaceVisibility: "hidden",
+            transformStyle: "preserve-3d",
           }}
         >
       {/* Title bar with traffic lights and URL */}
@@ -1458,6 +1461,9 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
           flexShrink: 0,
           borderTopLeftRadius: borderRadius,
           borderTopRightRadius: borderRadius,
+          transform: "translateZ(0px)",
+          transformStyle: "preserve-3d",
+          backfaceVisibility: "hidden",
         }}
       >
         {/* Traffic lights */}
@@ -1525,6 +1531,12 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
           borderBottomLeftRadius: borderRadius,
           borderBottomRightRadius: borderRadius,
           overflow: "hidden",
+          transform: "translateZ(0px)",
+          transformStyle: "preserve-3d",
+          backfaceVisibility: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
         {/* Logo - animates from content-center to top-left corner */}
@@ -1542,16 +1554,15 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
         {/* Flow content area */}
         <div
           style={{
-            position: "absolute",
-            left: "50%",
-            top: "50%",
-            transform: `translate(-50%, -50%) scale(${searchBarScale})`,
+            transform: `scale(${searchBarScale}) translateZ(0px)`,
             opacity: searchBarOpacity,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             gap: 12,
             width: 520,
+            transformStyle: "preserve-3d",
+            backfaceVisibility: "hidden",
           }}
         >
           {/* Phase 1 & 2: Search input (stays visible, shows typing then typed text) */}
