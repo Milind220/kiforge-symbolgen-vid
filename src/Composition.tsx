@@ -167,9 +167,9 @@ const COMPLETE_START = GENERATING_END + COMPLETE_APPEAR_DELAY;
 
 // Subtitle text changes (synced with flow phases)
 const SUBTITLE_TEXTS = [
-  "Search for any part",
-  "wait 2 min or less",
-  "enjoy your symbol",
+  "SEARCH FOR ANY PART",
+  "WAIT 2 MIN OR LESS",
+  "ENJOY YOUR SYMBOL",
 ] as const;
 // Subtitle changes at: generating start, complete start
 const SUBTITLE_PHASE_2_START = GENERATING_START; // "wait 2 min or less"
@@ -2254,7 +2254,7 @@ export const MyComposition: React.FC = () => {
                 position: "absolute",
                 left: "50%",
                 transform: "translateX(-50%)",
-                fontFamily: FONTS.sans,
+                fontFamily: FONTS.mono,
                 fontSize: 22,
                 fontWeight: 400,
                 color: COLORS.silver,
@@ -2277,7 +2277,7 @@ export const MyComposition: React.FC = () => {
                 position: "absolute",
                 left: "50%",
                 transform: "translateX(-50%)",
-                fontFamily: FONTS.sans,
+                fontFamily: FONTS.mono,
                 fontSize: 22,
                 fontWeight: 400,
                 color: COLORS.silver,
@@ -2307,7 +2307,7 @@ export const MyComposition: React.FC = () => {
                 position: "absolute",
                 left: "50%",
                 transform: "translateX(-50%)",
-                fontFamily: FONTS.sans,
+                fontFamily: FONTS.mono,
                 fontSize: 22,
                 fontWeight: 400,
                 color: COLORS.silver,
