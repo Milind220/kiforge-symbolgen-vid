@@ -116,7 +116,7 @@ const BROWSER_WINDOW = {
   borderRadius: 12, // Corner radius for the window
   verticalOffset: 130, // Pixels to lower the screen (positive = down)
   tiltDegrees: 4, // 3D tilt: positive = top leans back (appears farther)
-  shadow: "0 40px 80px -20px rgba(0, 0, 0, 0.5), 0 20px 40px -10px rgba(0, 0, 0, 0.3)", // Stronger floating shadow
+  shadow: "0 40px 120px -20px rgba(0, 0, 0, 0.95), 0 20px 60px -10px rgba(0, 0, 0, 0.85)", // Extremely dark shadow
 } as const;
 
 // Logo position within browser (animates from content-center to corner)
