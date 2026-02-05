@@ -87,7 +87,7 @@ const CLICK_SPARK_CONFIG = {
 } as const;
 
 // Big zoom animation - zooms into symbol, swaps colors
-const ZOOM_DELAY = 8; // Frames after sparks before zoom starts
+const ZOOM_DELAY = 6; // Frames after sparks before zoom starts
 const ZOOM_START = CLICK_SPARK_START + CLICK_SPARK_DURATION + ZOOM_DELAY;
 const ZOOM_DURATION = 10; // Frames for zoom animation
 const ZOOM_SCALE = 8; // How much to scale up (fills screen with symbol interior)
@@ -95,7 +95,7 @@ const ZOOM_SCALE = 8; // How much to scale up (fills screen with symbol interior
 // Logo zoom animation - appears after main zoom, grows from tiny dot
 const LOGO_ZOOM_DELAY = 0; // Frames after main zoom completes
 const LOGO_ZOOM_START = ZOOM_START + ZOOM_DURATION + LOGO_ZOOM_DELAY;
-const LOGO_ZOOM_DURATION = 15; // Frames for logo to zoom in
+const LOGO_ZOOM_DURATION = 12; // Frames for logo to zoom in
 const LOGO_INITIAL_SCALE = 0.01; // Start as tiny dot
 const LOGO_FINAL_SIZE = 380; // Final width in pixels (similar to symbolFrame's 240)
 
@@ -1291,7 +1291,10 @@ const StandaloneLogo: React.FC<{ frame: number }> = ({ frame }) => {
   // Don't render before animation starts or after browser window appears
   if (frame < LOGO_ZOOM_START || frame >= BROWSER_ZOOM_START) return null;
 
-  const scale = interpolate(logoSpring, [0, 1], [LOGO_INITIAL_SCALE, 1]);
+  const scale = interpolate(logoSpring, [0, 1], [LOGO_INITIAL_SCALE, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
   const displaySize = LOGO_FINAL_SIZE * scale;
 
   const opacity = interpolate(
@@ -1384,12 +1387,13 @@ const BrowserWindow: React.FC<{ frame: number }> = ({ frame }) => {
   // Content center in browser coords (from top-left of content area)
   const contentCenterX = width / 2;
   const contentCenterY = contentHeight / 2;
+  const logoStartY = contentCenterY - titleBarHeight / 2;
   // Corner position
   const cornerX = LOGO_CORNER_PADDING + LOGO_CORNER_SIZE / 2;
   const cornerY = LOGO_CORNER_PADDING + LOGO_CORNER_SIZE / 2;
   // Interpolate logo position
   const logoX = interpolate(zoomProgress, [0, 1], [contentCenterX, cornerX]);
-  const logoY = interpolate(zoomProgress, [0, 1], [contentCenterY, cornerY]);
+  const logoY = interpolate(zoomProgress, [0, 1], [logoStartY, cornerY]);
 
   // Transform origin: content-center (so logo stays at screen center during zoom)
   // Content center from browser top-left: (width/2, titleBarHeight + contentHeight/2)
